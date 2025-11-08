@@ -92,7 +92,7 @@
         </div>
         <div>
           <label>People (comma separated)</label>
-          <input id="people" type="text" placeholder="Adam, Partner" value="Adam, Partner" />
+          <input id="people" type="text" placeholder="Adam, Hannah" value="Adam, Hannah" />
         </div>
         <button class="btn accent" id="drawBtn">Draw this week</button>
         <button class="btn success" id="finishBtn" title="Pick all remaining items for this month (may exceed cap)">Finish month</button>
@@ -231,7 +231,7 @@
 
   // Initial
   capInput.value = state.cap ?? 8;
-  peopleInput.value = (state.people && state.people.length) ? state.people.join(', ') : 'Adam, Partner';
+  peopleInput.value = (state.people && state.people.length) ? state.people.join(', ') : 'Adam, Hannah';
   renderAll();
 
   // --- Functions ---
