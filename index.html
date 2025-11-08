@@ -251,7 +251,7 @@
   function acceptDraw(items, isFinish){
     const month = monthKey();
     const people = readPeople();
-    const assigned = autoAssign(items, people);
+    const assigned = fairAssign(items, people);
     const total = items.reduce((s,t)=>s+(t.weight||0),0);
 
     state[month].history.push({
@@ -353,6 +353,79 @@
     });
   }
 
+  function getMonthTotals(people){
+    const m = monthKey();
+    const totals = new Map(people.map(p=>[p,0]));
+    for(const h of state[m].history){
+      for(const it of h.items){
+        if(it.owner && totals.has(it.owner)){
+          totals.set(it.owner, (totals.get(it.owner)||0) + (it.weight||0));
+        }
+      }
+    }
+    return totals;
+  }
+
+  function fairAssign(items, people){
+    if(!people.length){ return items.map(i=>({...i, owner: undefined})); }
+    if(people.length===1){ return items.map(i=>({...i, owner: people[0]})); }
+
+    // Two people: compute an optimal split for the week that also equalizes month-to-date totals
+    if(people.length===2){
+      const [A,B] = people;
+      const monthTotals = getMonthTotals(people);
+      const mA = monthTotals.get(A)||0, mB = monthTotals.get(B)||0;
+      const delta = mA - mB; // positive => A has more so far
+      const weights = items.map(i=> i.weight||0);
+      const weekSum = weights.reduce((s,w)=>s+w,0);
+      const targetForA = (weekSum - delta)/2; // choose subset for A near this target
+
+      const n = items.length;
+      if(n <= 22){
+        let bestMask = 0, bestDiff = Infinity, bestSecondary = Infinity;
+        const maxMask = 1 << n;
+        for(let mask=0; mask<maxMask; mask++){
+          let s = 0;
+          for(let i=0;i<n;i++){ if(mask & (1<<i)) s += weights[i]; }
+          const diff = Math.abs(targetForA - s);
+          if(diff < bestDiff){
+            bestDiff = diff; bestMask = mask;
+            bestSecondary = Math.abs((mA + s) - (mB + (weekSum - s)));
+          } else if(diff === bestDiff){
+            const sec = Math.abs((mA + s) - (mB + (weekSum - s)));
+            if(sec < bestSecondary){ bestSecondary = sec; bestMask = mask; }
+          }
+        }
+        return items.map((it,i)=> ({...it, owner: (bestMask & (1<<i)) ? A : B}));
+      }
+      // Fallback greedy for unusually large weekly sets
+      const totals = new Map([[A,mA],[B,mB]]);
+      const weekTotals = new Map([[A,0],[B,0]]);
+      return [...items].sort((a,b)=>(b.weight||0)-(a.weight||0)).map(it=>{
+        let pick=A; let min=Infinity;
+        for(const p of [A,B]){
+          const score = (totals.get(p)||0) + (weekTotals.get(p)||0);
+          if(score < min){ min=score; pick=p; }
+        }
+        weekTotals.set(pick, (weekTotals.get(pick)||0) + (it.weight||0));
+        return {...it, owner: pick};
+      });
+    }
+
+    // 3+ people: greedy using month-to-date + this week totals
+    const monthTotals = getMonthTotals(people);
+    const weekTotals = new Map(people.map(p=>[p,0]));
+    return [...items].sort((a,b)=>(b.weight||0)-(a.weight||0)).map(it=>{
+      let pick = people[0], min = Infinity;
+      for(const p of people){
+        const score = (monthTotals.get(p)||0) + (weekTotals.get(p)||0);
+        if(score < min){ min = score; pick = p; }
+      }
+      weekTotals.set(pick, (weekTotals.get(p)||0) + (it.weight||0));
+      return {...it, owner: pick};
+    });
+  }
+
   function renderAll(){
     ensureMonthState();
     const m = monthKey();
@@ -365,7 +438,11 @@
     const totalWeight = chores.reduce((s,t)=> s + (t.weight||0), 0);
     const pct = totalWeight? Math.round((usedWeight/totalWeight)*100) : 0;
     progressBar.style.width = pct + '%';
-    monthStats.textContent = `${usedCount}/${chores.length} tasks • ${usedWeight.toFixed(1)}/${totalWeight.toFixed(1)} weight (${pct}%)`;
+    const peopleList = readPeople();
+    const mtot = getMonthTotals(peopleList);
+    const vals = peopleList.map(p => mtot.get(p)||0);
+    const fairness = peopleList.length ? ' • ' + peopleList.map(p => `${p} ${(mtot.get(p)||0).toFixed(1)}`).join(' • ') + (peopleList.length>1 ? ` (Δ ${(Math.max(...vals)-Math.min(...vals)).toFixed(1)})` : '') : '';
+    monthStats.textContent = `${usedCount}/${chores.length} tasks • ${usedWeight.toFixed(1)}/${totalWeight.toFixed(1)} weight (${pct}%)${fairness}`;
 
     // history list
     historyEl.innerHTML = '';
