@@ -1,254 +1,1111 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Weighted Weekly Chore Picker</title><meta name="color-scheme" content="light dark">
-<style>
-:root{--bg:#0b0c10;--text:#111827;--muted:#6b7280;--card:#fff;--accent:#2563eb;--accent2:#10b981;--border:#e5e7eb;color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#0b0c10;--text:#f3f4f6;--muted:#9ca3af;--card:#111827;--accent:#60a5fa;--accent2:#34d399;--border:#1f2937}}
-*{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
-.container{max-width:1100px;margin:0 auto;padding:24px}header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px}
-h1{font-size:clamp(20px,4vw,28px);margin:0}.sub{color:var(--muted);font-size:14px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.05)}
-.controls,.row{display:flex;flex-wrap:wrap;gap:12px;align-items:end}
-label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
-input[type=number],input[type=text]{background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;border-radius:10px;min-width:140px}
-input[type=text]{min-width:220px}
-.btn{appearance:none;border:1px solid var(--border);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
-.btn.secondary{background:transparent;color:var(--text)}.btn.accent{background:var(--accent);color:#fff;border-color:transparent}.btn.success{background:var(--accent2);color:#06261b;border-color:transparent}
-.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--border);padding:4px 10px;border-radius:999px}
-.section-title{display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px}
-.progress{height:10px;width:100%;background:transparent;border:1px solid var(--border);border-radius:999px;overflow:hidden}.progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .3s ease}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.task-card{position:relative;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:14px 16px}
-.task-title{font-weight:700;margin:0 0 6px;font-size:16px}.muted{color:var(--muted);font-size:12px}.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:1000}
-.overlay.show{display:flex}.draw-modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;width:min(720px,94vw);box-shadow:0 30px 60px rgba(0,0,0,.25)}
-.draw-item{position:relative;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 14px 28px rgba(0,0,0,.08);margin:8px 0}
-.roller{font-weight:800;letter-spacing:.2px;font-size:18px;line-height:1.35;opacity:.85;animation:pulse 1s ease-in-out infinite}.roller.final{animation:none}
-@keyframes pulse{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}@keyframes pop{0%{transform:scale(.92);opacity:.2}70%{transform:scale(1.03);opacity:1}100%{transform:scale(1)}}
-.confetti{position:absolute;width:8px;height:12px;border-radius:2px;top:8px;left:50%;transform:translateX(-50%);opacity:.95;animation:conf 1.6s ease-out forwards}
-@keyframes conf{0%{transform:translate(-50%,-10px) rotate(0deg);opacity:1}100%{transform:translate(calc(-50% + var(--dx,0px)),140px) rotate(300deg);opacity:0}}
-.owner-line{display:flex;align-items:center;gap:8px;margin-top:8px}.owner-badge{font-size:12px;padding:4px 8px;border-radius:8px;background:rgba(16,185,129,.14);color:#10b981;font-weight:800}
-</style></head>
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Weighted Weekly Chore Picker</title>
+  <meta name="color-scheme" content="light dark" />
+  <style>
+    :root{--bg:#0b0c10;--text:#111827;--muted:#6b7280;--card:#fff;--accent:#2563eb;--accent2:#10b981;--border:#e5e7eb;color-scheme:light dark}
+    @media (prefers-color-scheme:dark){:root{--bg:#0b0c10;--text:#f3f4f6;--muted:#9ca3af;--card:#111827;--accent:#60a5fa;--accent2:#34d399;--border:#1f2937}}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    h1{font-size:clamp(20px,4vw,28px);margin:0}
+    .sub{color:var(--muted);font-size:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.05)}
+    .controls,.row{display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    input[type=number],input[type=text]{background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;border-radius:10px;min-width:140px}
+    input[type=text]{min-width:220px}
+    .btn{appearance:none;border:1px solid var(--border);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
+    .btn.secondary{background:transparent;color:var(--text)}
+    .btn.accent{background:var(--accent);color:#fff;border-color:transparent}
+    .btn.success{background:var(--accent2);color:#06261b;border-color:transparent}
+    .btn.sm{padding:7px 10px;border-radius:10px;font-size:12px}
+    .btn.danger{background:transparent;color:#ef4444;border-color:#ef4444}
+    .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--border);padding:4px 10px;border-radius:999px}
+    .section-title{display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px}
+    .progress{height:10px;width:100%;background:transparent;border:1px solid var(--border);border-radius:999px;overflow:hidden}
+    .progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .3s ease}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    .task-card{position:relative;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:14px 16px}
+    .task-title{font-weight:700;margin:0 0 6px;font-size:16px}
+    .muted{color:var(--muted);font-size:12px}
+    .badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+    .badge.due{border-color:rgba(16,185,129,.55);color:var(--accent2)}
+    .badge.overdue{border-color:rgba(239,68,68,.55);color:#ef4444}
+    .badge.snoozed{border-color:rgba(245,158,11,.55);color:#f59e0b}
+    .owner-badge{font-size:12px;padding:4px 8px;border-radius:8px;background:rgba(16,185,129,.14);color:#10b981;font-weight:800}
+
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
+    .table input[type=number]{min-width:110px}
+    .table input[type=text]{min-width:180px}
+
+    /* Draw overlay */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:1000}
+    .overlay.show{display:flex}
+    .draw-modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;width:min(720px,94vw);box-shadow:0 30px 60px rgba(0,0,0,.25)}
+    .draw-item{position:relative;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 14px 28px rgba(0,0,0,.08);margin:8px 0}
+    .roller{font-weight:800;letter-spacing:.2px;font-size:18px;line-height:1.35;opacity:.85;animation:pulse 1s ease-in-out infinite}
+    .roller.final{animation:none}
+    @keyframes pulse{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+    @keyframes pop{0%{transform:scale(.92);opacity:.2}70%{transform:scale(1.03);opacity:1}100%{transform:scale(1)}}
+    .confetti{position:absolute;width:8px;height:12px;border-radius:2px;top:8px;left:50%;transform:translateX(-50%);opacity:.95;animation:conf 1.6s ease-out forwards}
+    @keyframes conf{0%{transform:translate(-50%,-10px) rotate(0deg);opacity:1}100%{transform:translate(calc(-50% + var(--dx,0px)),140px) rotate(300deg);opacity:0}}
+    .owner-line{display:flex;align-items:center;gap:8px;margin-top:8px}
+  </style>
+</head>
 <body>
-<div class="container">
-  <header>
-    <div><h1>Weighted Weekly Chore Picker</h1><div class="sub">Monthly pool • No repeats • Weekly cap • Two-person fairness</div></div>
-    <div style="display:flex;gap:8px;align-items:center"><div class="pill" id="monthPill">Month: —</div></div>
-  </header>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Weighted Weekly Chore Picker</h1>
+        <div class="sub">Cadence-aware • Remembers last done • Outstanding tasks • Two-person fairness</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="pill" id="monthPill">Month: —</div>
+      </div>
+    </header>
 
-  <section class="card">
-    <div class="controls">
-      <div><label for="cap">Weekly weight cap</label><input id="cap" type="number" step="0.5" min="0.5" value="8"></div>
-      <div><label>People (comma separated)</label><input id="people" type="text" placeholder="Adam, Hannah" value="Adam, Hannah"></div>
-      <button class="btn accent" id="drawBtn">Draw this week</button>
-      <button class="btn success" id="finishBtn" title="Pick all remaining items for this month">Finish month</button>
-      <button class="btn secondary" id="undoBtn" title="Undo last week">Undo last week</button>
-      <button class="btn secondary" id="resetBtn" title="Start new month">Reset month</button>
+    <section class="card">
+      <div class="controls">
+        <div>
+          <label for="cap">Weekly weight cap</label>
+          <input id="cap" type="number" step="0.5" min="0.5" value="8" />
+        </div>
+        <div>
+          <label>People (comma separated)</label>
+          <input id="people" type="text" placeholder="Adam, Hannah" value="Adam, Hannah" />
+        </div>
+        <button class="btn accent" id="drawBtn">Draw this week</button>
+        <button class="btn success" id="finishBtn" title="Assign all currently-due tasks (ignores cap)">Finish due</button>
+        <button class="btn secondary" id="undoBtn" title="Undo last assignment batch">Undo last</button>
+        <button class="btn secondary" id="resetBtn" title="Clears this month's history only (does not forget last done)">Clear month history</button>
+      </div>
+
+      <div class="section-title" style="margin-top:14px">
+        <strong>This month</strong>
+        <span class="muted" id="monthStats">—</span>
+      </div>
+      <div class="progress"><span id="progressBar"></span></div>
+
+      <div class="section-title" style="margin-top:16px">
+        <strong>Outstanding</strong>
+        <span class="muted" id="outstandingMeta">—</span>
+      </div>
+      <div class="grid" id="outstanding"></div>
+
+      <div class="section-title" style="margin-top:16px">
+        <strong>Completed</strong>
+        <span class="muted" id="completedMeta">—</span>
+      </div>
+      <div class="grid" id="completed"></div>
+
+      <div class="section-title" style="margin-top:16px">
+        <strong>Last assignment</strong>
+        <span class="muted" id="lastDrawMeta">—</span>
+      </div>
+      <div class="grid" id="lastDraw"></div>
+    </section>
+
+    <section class="section-title" style="margin-top:16px">
+      <strong>Due tasks</strong>
+      <span class="muted" id="dueMeta">—</span>
+    </section>
+    <div class="grid" id="due"></div>
+
+    <section class="section-title" style="margin-top:16px">
+      <strong>Manage chores</strong>
+      <span class="muted">Set cadence, enable/disable, and mark done</span>
+    </section>
+    <div class="card">
+      <div class="row">
+        <input id="newName" type="text" placeholder="Chore name" />
+        <input id="newWeight" type="number" step="0.5" placeholder="Weight" />
+        <input id="newCadence" type="number" step="1" placeholder="Cadence days (e.g., 14)" />
+        <input id="newTags" type="text" placeholder="Tags (comma separated)" />
+        <button class="btn" id="addBtn">Add chore</button>
+        <button class="btn secondary" id="exportBtn">Export JSON</button>
+        <input type="file" id="importInput" accept="application/json" style="display:none" />
+        <button class="btn secondary" id="importBtn">Import JSON</button>
+      </div>
+
+      <div style="overflow:auto;margin-top:12px">
+        <table class="table" id="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th style="width:110px">Weight</th>
+              <th style="width:140px">Cadence (days)</th>
+              <th style="width:120px">Enabled</th>
+              <th>Tags</th>
+              <th style="width:180px">Last done</th>
+              <th style="width:180px">Next due</th>
+              <th style="width:180px"></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="section-title" style="margin-top:14px"><strong>This month</strong> <span class="muted" id="monthStats">—</span></div>
-    <div class="progress"><span id="progressBar"></span></div>
+  </div>
 
-    <div class="section-title" style="margin-top:16px"><strong>Last draw</strong> <span class="muted" id="lastDrawMeta">—</span></div>
-    <div class="grid" id="lastDraw"></div>
-  </section>
-
-  <section class="section-title" style="margin-top:16px"><strong>Remaining tasks this month</strong> <span class="muted" id="remainingMeta">—</span></section>
-  <div class="grid" id="remaining"></div>
-
-  <section class="section-title" style="margin-top:16px"><strong>Manage chores</strong><span class="muted">Changes save locally</span></section>
-  <div class="card">
-    <div class="row">
-      <input id="newName" type="text" placeholder="Chore name">
-      <input id="newWeight" type="number" step="0.5" placeholder="Weight">
-      <input id="newTags" type="text" placeholder="Tags (comma separated)">
-      <button class="btn" id="addBtn">Add chore</button>
-      <button class="btn secondary" id="exportBtn">Export JSON</button>
-      <input type="file" id="importInput" accept="application/json" style="display:none">
-      <button class="btn secondary" id="importBtn">Import JSON</button>
-    </div>
-    <div style="overflow:auto;margin-top:12px">
-      <table class="table" id="table"><thead><tr><th>Name</th><th style="width:120px">Weight</th><th>Tags</th><th style="width:80px"></th></tr></thead><tbody></tbody></table>
+  <!-- Draw overlay -->
+  <div id="drawOverlay" class="overlay" aria-hidden="true">
+    <div class="draw-modal" role="dialog" aria-modal="true" aria-labelledby="drawTitle">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px">
+        <h2 id="drawTitle" class="task-title" style="margin:0;font-size:20px">Weekly Draw</h2>
+        <div id="drawMeta" class="muted">—</div>
+      </div>
+      <div id="drawList"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn secondary" id="skipDraw">Skip animation</button>
+      </div>
     </div>
   </div>
-</div>
-
-<!-- Draw overlay -->
-<div id="drawOverlay" class="overlay" aria-hidden="true"><div class="draw-modal" role="dialog" aria-modal="true" aria-labelledby="drawTitle">
-  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px"><h2 id="drawTitle" class="task-title" style="margin:0;font-size:20px">Weekly Draw</h2><div id="drawMeta" class="muted">—</div></div>
-  <div id="drawList"></div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn secondary" id="skipDraw">Skip animation</button></div>
-</div></div>
 
 <script>
 (function(){
   const monthKey=()=>new Date().toISOString().slice(0,7);
-  const LS_DATA='choresDeck_v1_data';
-  const LS_STATE='choresDeck_v1_state';
+  const LS_DATA='choresDeck_v2_data';
+  const LS_STATE='choresDeck_v2_state';
+  const LS_OLD_DATA='choresDeck_v1_data';
+  const LS_OLD_STATE='choresDeck_v1_state';
   const WEEK_TOL=0.5; // weekly fairness tolerance (±0.5)
+  const DEFAULT_CADENCE_DAYS=30;
 
+  // Final list only (as requested earlier) - now with default cadenceDays
+  // Defaults keep your original "monthly pool" feel by using cadenceDays=30 for everything.
+  // You can set biweekly to 14, weekly to 7, etc. in the Manage table.
   const defaultChores=[
-    {id:'cleaning_shared_bathroom',name:'Cleaning Shared Bathroom',weight:3,tags:['Bathroom']},
-    {id:'cleaning_bedroom_bathroom',name:'Cleaning Bedroom Bathroom',weight:3,tags:['Bathroom']},
-    {id:'cleaning_base_floor_bathroom',name:'Cleaning Base Floor Bathroom',weight:3,tags:['Bathroom']},
-    {id:'sweeping_main_level_floor',name:'Sweeping the main level floor',weight:1,tags:['Floors']},
-    {id:'sweeping_second_level_floor',name:'Sweeping the second level floor',weight:1,tags:['Floors']},
-    {id:'mopping_main_level_floor',name:'Mopping the main level floor',weight:2,tags:['Floors']},
-    {id:'mopping_second_level_floor',name:'Mopping the second level floor',weight:2,tags:['Floors']},
-    {id:'metsi_nails',name:'Metsi Nails',weight:1,tags:['Pet']},
-    {id:'metsi_bath',name:'Metsi Bath',weight:1.5,tags:['Pet']},
-    {id:'inspecting_the_attic',name:'Inspecting the attic',weight:2.5,tags:['Home Care']},
-    {id:'weeding',name:'Weeding',weight:2,tags:['Outdoor']},
-    {id:'lawn_mowing_weed_wacking',name:'Lawn Mowing/Weed Wacking',weight:3,tags:['Outdoor']},
-    {id:'watering_the_plants',name:'Watering the plants',weight:1,tags:['Outdoor']},
-    {id:'cleaning_organizing_the_fridge',name:'Cleaning/Organizing the Fridge',weight:2,tags:['Kitchen']},
-    {id:'dusting_the_main_floor',name:'Dusting the main floor',weight:1.5,tags:['Dusting']},
-    {id:'dusting_the_second_floor',name:'Dusting the second floor',weight:1.5,tags:['Dusting']},
-    {id:'wiping_down_windows_main_floor',name:'Wiping Down Windows main floor',weight:2,tags:['Windows']},
-    {id:'wiping_down_windows_second_floor',name:'Wiping Down Windows second floor',weight:2,tags:['Windows']},
-    {id:'tidying_main_floor',name:'General Item Cleanup/Tidying Main Floor',weight:1,tags:['Tidy']},
-    {id:'tidying_second_floor',name:'General Item Cleanup/Tidying Second Floor',weight:1,tags:['Tidy']},
-    {id:'wiping_down_walls',name:'Wiping Down Walls',weight:2,tags:['Surfaces']},
-    {id:'vacuuming_stairs_living_room',name:'Vacuuming Stairs/Living Room',weight:2,tags:['Floors']},
-    {id:'vaccuuming_upstairs',name:'Vaccuuming Upstairs',weight:1.5,tags:['Floors']}
+    {id:'cleaning_shared_bathroom',name:'Cleaning Shared Bathroom',weight:3,cadenceDays:30,tags:['Bathroom'],enabled:true},
+    {id:'cleaning_bedroom_bathroom',name:'Cleaning Bedroom Bathroom',weight:3,cadenceDays:30,tags:['Bathroom'],enabled:true},
+    {id:'cleaning_base_floor_bathroom',name:'Cleaning Base Floor Bathroom',weight:3,cadenceDays:30,tags:['Bathroom'],enabled:true},
+    {id:'sweeping_main_level_floor',name:'Sweeping the main level floor',weight:1,cadenceDays:30,tags:['Floors'],enabled:true},
+    {id:'sweeping_second_level_floor',name:'Sweeping the second level floor',weight:1,cadenceDays:30,tags:['Floors'],enabled:true},
+    {id:'mopping_main_level_floor',name:'Mopping the main level floor',weight:2,cadenceDays:30,tags:['Floors'],enabled:true},
+    {id:'mopping_second_level_floor',name:'Mopping the second level floor',weight:2,cadenceDays:30,tags:['Floors'],enabled:true},
+    {id:'metsi_nails',name:'Metsi Nails',weight:1,cadenceDays:30,tags:['Pet'],enabled:true},
+    {id:'metsi_bath',name:'Metsi Bath',weight:1.5,cadenceDays:30,tags:['Pet'],enabled:true},
+    {id:'inspecting_the_attic',name:'Inspecting the attic',weight:2.5,cadenceDays:30,tags:['Home Care'],enabled:true},
+    {id:'weeding',name:'Weeding',weight:2,cadenceDays:30,tags:['Outdoor'],enabled:true},
+    {id:'lawn_mowing_weed_wacking',name:'Lawn Mowing/Weed Wacking',weight:3,cadenceDays:30,tags:['Outdoor'],enabled:true},
+    {id:'watering_the_plants',name:'Watering the plants',weight:1,cadenceDays:30,tags:['Outdoor'],enabled:true},
+    {id:'cleaning_organizing_the_fridge',name:'Cleaning/Organizing the Fridge',weight:2,cadenceDays:30,tags:['Kitchen'],enabled:true},
+    {id:'dusting_the_main_floor',name:'Dusting the main floor',weight:1.5,cadenceDays:30,tags:['Dusting'],enabled:true},
+    {id:'dusting_the_second_floor',name:'Dusting the second floor',weight:1.5,cadenceDays:30,tags:['Dusting'],enabled:true},
+    {id:'wiping_down_windows_main_floor',name:'Wiping Down Windows main floor',weight:2,cadenceDays:30,tags:['Windows'],enabled:true},
+    {id:'wiping_down_windows_second_floor',name:'Wiping Down Windows second floor',weight:2,cadenceDays:30,tags:['Windows'],enabled:true},
+    {id:'tidying_main_floor',name:'General Item Cleanup/Tidying Main Floor',weight:1,cadenceDays:30,tags:['Tidy'],enabled:true},
+    {id:'tidying_second_floor',name:'General Item Cleanup/Tidying Second Floor',weight:1,cadenceDays:30,tags:['Tidy'],enabled:true},
+    {id:'wiping_down_walls',name:'Wiping Down Walls',weight:2,cadenceDays:30,tags:['Surfaces'],enabled:true},
+    {id:'vacuuming_stairs_living_room',name:'Vacuuming Stairs/Living Room',weight:2,cadenceDays:30,tags:['Floors'],enabled:true},
+    {id:'vaccuuming_upstairs',name:'Vaccuuming Upstairs',weight:1.5,cadenceDays:30,tags:['Floors'],enabled:true}
   ];
 
-  let chores=load(LS_DATA)||defaultChores; let state=load(LS_STATE)||{}; ensureMonthState();
+  // State shape (persisted):
+  // state = {
+  //   months: { [YYYY-MM]: { history: [{ts,total,items:[{id,name,weight,owner}]}] } },
+  //   open: { [taskId]: {assignedTs, owner} },
+  //   meta: { [taskId]: { lastDoneTs, snoozeUntilTs } },
+  //   cap, people
+  // }
+
+  // Migrate from v1 storage if present
+  let chores=load(LS_DATA);
+  if(!chores) chores = load(LS_OLD_DATA);
+  if(!chores) chores = defaultChores;
+
+  let state=load(LS_STATE);
+  if(!state) state = load(LS_OLD_STATE);
+  if(!state) state = {};
+  normalizeData();
+
+  // elements
   const $=q=>document.querySelector(q);
-  const capInput=$('#cap'), peopleInput=$('#people'), monthPill=$('#monthPill'), monthStats=$('#monthStats'), progressBar=$('#progressBar');
-  const lastDrawEl=$('#lastDraw'), lastDrawMeta=$('#lastDrawMeta'), remainingEl=$('#remaining'), remainingMeta=$('#remainingMeta');
+  const capInput=$('#cap');
+  const peopleInput=$('#people');
+  const monthPill=$('#monthPill');
+  const monthStats=$('#monthStats');
+  const progressBar=$('#progressBar');
+  const outstandingEl=$('#outstanding');
+  const outstandingMeta=$('#outstandingMeta');
+  const completedEl=$('#completed');
+  const completedMeta=$('#completedMeta');
+  const lastDrawEl=$('#lastDraw');
+  const lastDrawMeta=$('#lastDrawMeta');
+  const dueEl=$('#due');
+  const dueMeta=$('#dueMeta');
   const tableBody=$('#table tbody');
 
-  // Wire up controls
+  // wire
   $('#drawBtn').addEventListener('click', onDrawWeek);
-  $('#finishBtn').addEventListener('click', ()=>acceptDraw(remainingPool(),true));
-  $('#undoBtn').addEventListener('click', undoLastWeek);
-  $('#resetBtn').addEventListener('click', resetMonthConfirm);
+  $('#finishBtn').addEventListener('click', ()=>assignBatch(getDueTasks(), true));
+  $('#undoBtn').addEventListener('click', undoLastBatch);
+  $('#resetBtn').addEventListener('click', clearMonthHistory);
   $('#exportBtn').addEventListener('click', exportJSON);
   $('#importBtn').addEventListener('click', ()=>$('#importInput').click());
   $('#importInput').addEventListener('change', importJSON);
   $('#addBtn').addEventListener('click', addChore);
 
-  capInput.value=(state.cap==null?8:state.cap); peopleInput.value=(state.people&&state.people.length)?state.people.join(', '):'Adam, Hannah';
+  capInput.value = (state.cap==null?8:state.cap);
+  peopleInput.value = (state.people && state.people.length)? state.people.join(', ') : 'Adam, Hannah';
+
   renderAll();
 
-  // ==== Actions ====
-  function onDrawWeek(){
-    const cap=getCap(); const pool=remainingPool();
-    if(pool.length===0){ alert('No remaining tasks this month. Use Reset month to start a new month.'); return; }
-    const picked=pickWeeklySet(pool,cap,readPeople());
-    if(picked.length===0){ const lightest=[...pool].sort((a,b)=>a.weight-b.weight)[0]; if(lightest) picked.push(lightest); }
-    const assigned=fairAssign(picked,readPeople());
-    animateDraw(assigned).then(()=>acceptDraw(assigned,false));
-  }
-  function acceptDraw(items,isFinish){
-    const m=monthKey(); const people=readPeople(); const hasOwners=items.every(i=>i.owner); const assigned=hasOwners?items:fairAssign(items,people);
-    const total=items.reduce((s,t)=>s+(t.weight||0),0);
-    state[m].history.push({ts:Date.now(),items:assigned,total,finish:!!isFinish});
-    const used=new Set(state[m].used); items.forEach(i=>used.add(i.id)); state[m].used=[...used];
-    state.cap=getCap(); state.people=people; save(LS_STATE,state); renderAll();
-  }
-  function undoLastWeek(){ const m=monthKey(); const h=state[m].history; if(!h.length){alert('Nothing to undo.');return;} const last=h.pop(); const ids=new Set(last.items.map(x=>x.id)); state[m].used=state[m].used.filter(id=>!ids.has(id)); save(LS_STATE,state); renderAll(); }
-  function resetMonthConfirm(){ if(confirm("Start a fresh month now? This clears this month's draws.")){ const m=monthKey(); state[m]={used:[],history:[]}; save(LS_STATE,state); renderAll(); } }
+  // --------------------
+  // Behavior clarifier:
+  // A task is eligible ("due") if:
+  // - enabled
+  // - not currently outstanding (open)
+  // - not snoozed
+  // - lastDone is missing OR (now - lastDone) >= cadenceDays
+  // This means tasks can recur within a month if cadenceDays is short.
+  // --------------------
 
-  // ==== Export / Import ====
+  function normalizeData(){
+    if(!state.months) state.months = {};
+    if(!state.open) state.open = {};
+    if(!state.meta) state.meta = {};
+    if(!state.doneLog) state.doneLog = [];
+    const m=monthKey();
+    if(!state.months[m]) state.months[m] = { history: [] };
+
+    // Normalize chores
+    chores = chores.map(c=>{
+      const id = slug(c.id || c.name);
+      const name = String(c.name||'').trim() || id;
+      const weight = clampNum(c.weight, 0.5, 99, 1);
+      const cadenceDays = clampNum(c.cadenceDays ?? c.cadence_days ?? c.cadence, 1, 365, DEFAULT_CADENCE_DAYS);
+      const tags = Array.isArray(c.tags)? c.tags.filter(Boolean) : [];
+      const enabled = (c.enabled === false) ? false : true;
+      return { id, name, weight, cadenceDays, tags, enabled };
+    });
+
+    // Drop open/meta for missing ids
+    const ids = new Set(chores.map(c=>c.id));
+    // Prune completion log: keep only known task ids, and keep it bounded in size
+    if(!Array.isArray(state.doneLog)) state.doneLog = [];
+    const cutoff = Date.now() - 366*86400000;
+    state.doneLog = state.doneLog
+      .filter(ev=>ev && ids.has(ev.id) && typeof ev.ts==='number' && ev.ts>=cutoff)
+      .slice(-500);
+
+    for(const k of Object.keys(state.open)) if(!ids.has(k)) delete state.open[k];
+    for(const k of Object.keys(state.meta)) if(!ids.has(k)) delete state.meta[k];
+
+    save(LS_DATA, chores);
+    save(LS_STATE, state);
+  }
+
+  // --------- Draw / Assign ---------
+  function onDrawWeek(){
+    const cap=getCap();
+    const people=readPeople();
+    const pool=getDueTasks();
+    if(pool.length===0){ alert('No due tasks right now. (Try lowering cadence days or mark tasks not done.)'); return; }
+
+    const picked = pickWeeklySet(pool, cap, people);
+    const assigned = fairAssign(picked, people);
+    animateDraw(assigned).then(()=> assignBatch(assigned, false));
+  }
+
+  function assignBatch(items, isFinish){
+    if(!items || items.length===0) return;
+    const m=monthKey();
+    if(!state.months[m]) state.months[m] = { history: [] };
+
+    const now=Date.now();
+    const total=items.reduce((s,t)=>s+(t.weight||0),0);
+    state.months[m].history.push({ ts: now, items: items.map(x=>({id:x.id,name:x.name,weight:x.weight,owner:x.owner})), total, finish: !!isFinish });
+
+    // mark as outstanding
+    for(const it of items){
+      state.open[it.id] = { assignedTs: now, owner: it.owner || '' };
+    }
+
+    state.cap=getCap();
+    state.people=readPeople();
+    save(LS_STATE, state);
+    renderAll();
+  }
+
+  function undoLastBatch(){
+    const m=monthKey();
+    const hist=(state.months[m] && state.months[m].history) ? state.months[m].history : [];
+    if(!hist.length){ alert('Nothing to undo.'); return; }
+    const last = hist.pop();
+    // remove open flags only for items from that batch IF they were not completed in the meantime
+    for(const it of (last.items||[])){
+      if(state.open[it.id] && state.open[it.id].assignedTs === last.ts){
+        delete state.open[it.id];
+      }
+    }
+    save(LS_STATE,state);
+    renderAll();
+  }
+
+  function clearMonthHistory(){
+    if(!confirm("Clear this month's assignment history? (Last done dates and outstanding tasks remain.)")) return;
+    const m=monthKey();
+    state.months[m] = { history: [] };
+    save(LS_STATE,state);
+    renderAll();
+  }
+
+  // --------- Completion / Snooze ---------
+  function markDone(taskId){
+    const now=Date.now();
+    const t=getTaskById(taskId);
+    if(!t) return;
+
+    // record completion event (for Completed list)
+    if(!Array.isArray(state.doneLog)) state.doneLog = [];
+    const owner = (state.open[taskId] && state.open[taskId].owner) ? state.open[taskId].owner : '';
+    state.doneLog.push({ ts: now, id: taskId, name: t.name, weight: t.weight, owner });
+    if(state.doneLog.length>500) state.doneLog = state.doneLog.slice(-500);
+
+    if(!state.meta[taskId]) state.meta[taskId] = {};
+    state.meta[taskId].lastDoneTs = now;
+    // clear snooze and outstanding
+    delete state.meta[taskId].snoozeUntilTs;
+    delete state.open[taskId];
+    save(LS_STATE,state);
+    renderAll();
+  }
+
+  function markNotDone(taskId){
+    if(!state.meta[taskId]) state.meta[taskId] = {};
+    delete state.meta[taskId].lastDoneTs;
+    delete state.meta[taskId].snoozeUntilTs;
+    // Do not touch doneLog; it's a history record
+    save(LS_STATE,state);
+    renderAll();
+  }
+
+  function snooze(taskId, days){
+    const now=Date.now();
+    const d = clampNum(days, 1, 365, 7);
+    if(!state.meta[taskId]) state.meta[taskId] = {};
+    state.meta[taskId].snoozeUntilTs = now + d*86400000;
+    // remove from outstanding
+    delete state.open[taskId];
+    save(LS_STATE,state);
+    renderAll();
+  }
+
+  // --------- Due logic ---------
+  function getDueTasks(){
+    const now=Date.now();
+    return chores.filter(c=> isEnabled(c) && !state.open[c.id] && isDueNow(c, now));
+  }
+
+  function isEnabled(c){ return c.enabled !== false; }
+
+  function isDueNow(c, now){
+    const meta = state.meta[c.id] || {};
+    const snoozeUntil = meta.snoozeUntilTs || 0;
+    if(snoozeUntil && now < snoozeUntil) return false;
+    const lastDone = meta.lastDoneTs || 0;
+    if(!lastDone) return true;
+    const cadenceDays = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
+    return (now - lastDone) >= cadenceDays*86400000;
+  }
+
+  function nextDueTs(c){
+    const meta = state.meta[c.id] || {};
+    const lastDone = meta.lastDoneTs || 0;
+    const cadenceDays = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
+    const due = lastDone ? (lastDone + cadenceDays*86400000) : Date.now();
+    const snoozeUntil = meta.snoozeUntilTs || 0;
+    return Math.max(due, snoozeUntil);
+  }
+
+  // --------- Selection & Fairness ---------
+  function pickWeeklySet(pool, cap, people){
+    if(people.length===2){
+      // pick a subset that (a) can be split within ±0.5 when feasible, then (b) uses cap well.
+      return optimizeWeeklySubset2(pool, cap, people);
+    }
+    return drawToCapRandom(pool, cap);
+  }
+
+  function drawToCapRandom(pool, cap){
+    const remaining=pool.slice();
+    const picked=[];
+    let total=0;
+    let guard=1000;
+    while(guard-- && remaining.length){
+      const feasible=remaining.filter(t=> total+(t.weight||0) <= cap);
+      if(!feasible.length) break;
+      const chosen=weightedPick(feasible);
+      picked.push(chosen);
+      total += (chosen.weight||0);
+      const idx=remaining.findIndex(x=>x.id===chosen.id);
+      if(idx>-1) remaining.splice(idx,1);
+    }
+    if(picked.length===0){
+      const lightest=[...pool].sort((a,b)=>(a.weight||0)-(b.weight||0))[0];
+      if(lightest) picked.push(lightest);
+    }
+    return picked;
+  }
+
+  function weightedPick(list){
+    const tot=list.reduce((s,t)=>s+(t.weight||1),0);
+    let r=Math.random()*tot;
+    for(const it of list){ r -= (it.weight||1); if(r<=0) return it; }
+    return list[list.length-1];
+  }
+
+  // Optimizer: for 2 people, pick subset under capU (half-units) that prefers weekly diff <= 0.5
+  function optimizeWeeklySubset2(pool, cap, people){
+    const capU=Math.max(1,Math.floor(cap*2));
+    const T=Math.round(WEEK_TOL*2); // 0.5 -> 1 unit
+
+    // Convert weights to half-units and filter items too large
+    const items=pool
+      .map(it=>({it,wU:Math.max(1,Math.round((it.weight||0)*2))}))
+      .filter(x=>x.wU<=capU);
+
+    let best=null; // {hasTol,capGap,weekDiffU,sumU,mask}
+
+    function better(a,b){
+      if(!a) return true;
+      if(a.hasTol!==b.hasTol) return b.hasTol;
+      if(a.capGap!==b.capGap) return b.capGap<a.capGap;
+      if(a.weekDiffU!==b.weekDiffU) return b.weekDiffU<a.weekDiffU;
+      if(a.sumU!==b.sumU) return b.sumU>a.sumU;
+      return false;
+    }
+
+    function evalSubset(sumU, dp, mask){
+      if(sumU===0) return;
+      // can we split this subset within tolerance?
+      let bestDiffU=Infinity;
+      for(let sU=0;sU<=sumU;sU++){
+        if(((dp>>sU)&1)!==1) continue;
+        const diffU=Math.abs(sumU-2*sU);
+        if(diffU<bestDiffU) bestDiffU=diffU;
+      }
+      const cand={
+        hasTol: bestDiffU<=T,
+        capGap: (capU-sumU),
+        weekDiffU: bestDiffU,
+        sumU,
+        mask
+      };
+      if(better(best,cand)) best=cand;
+    }
+
+    function dfs(i, sumU, dp, mask){
+      if(sumU>capU) return;
+      if(mask) evalSubset(sumU, dp, mask);
+      if(i>=items.length) return;
+      const wU=items[i].wU;
+      dfs(i+1, sumU+wU, (dp<<wU)|dp, mask|(1<<i));
+      dfs(i+1, sumU, dp, mask);
+    }
+
+    // Limit search size to avoid worst-case explosions.
+    // If we have too many items, fallback to greedy fill then fairness assignment.
+    if(items.length>24){
+      return drawToCapRandom(pool, cap);
+    }
+
+    dfs(0,0,1,0);
+    if(!best) return drawToCapRandom(pool, cap);
+
+    const out=[];
+    for(let i=0;i<items.length;i++) if((best.mask&(1<<i))!==0) out.push(items[i].it);
+    return out.length? out : drawToCapRandom(pool, cap);
+  }
+
+  // Assign owners to picked items, trying to keep this week's diff <= 0.5 when feasible.
+  function fairAssign(items, people){
+    if(!people.length) return items.map(i=>({...i,owner:undefined}));
+    if(people.length===1) return items.map(i=>({...i,owner:people[0]}));
+
+    if(people.length===2){
+      const [A,B]=people;
+      const weights=items.map(i=>i.weight||0);
+      const W=weights.reduce((s,w)=>s+w,0);
+      const n=items.length;
+      if(n<=26){
+        let bestMask=0;
+        let best={hasTol:false,weekDiff:1e9,targetDiff:1e9};
+        const target=W/2;
+        for(let mask=0; mask<(1<<n); mask++){
+          let s=0;
+          for(let i=0;i<n;i++) if((mask&(1<<i))!==0) s+=weights[i];
+          const weekDiff=Math.abs(W-2*s);
+          const hasTol=weekDiff<=WEEK_TOL+1e-9;
+          const tdiff=Math.abs(target-s);
+          const cand={hasTol,weekDiff,targetDiff:tdiff};
+          const better=(cand.hasTol&&!best.hasTol)||
+            (cand.hasTol===best.hasTol && cand.weekDiff<best.weekDiff-1e-9)||
+            (cand.hasTol===best.hasTol && Math.abs(cand.weekDiff-best.weekDiff)<=1e-9 && cand.targetDiff<best.targetDiff-1e-9);
+          if(better){best=cand; bestMask=mask;}
+        }
+        return items.map((it,i)=>({...it,owner:((bestMask&(1<<i))!==0)?A:B}));
+      }
+    }
+
+    // fallback greedy
+    const weekTotals=new Map(people.map(p=>[p,0]));
+    return [...items].sort((a,b)=>(b.weight||0)-(a.weight||0)).map(it=>{
+      let pick=people[0], min=Infinity;
+      for(const p of people){
+        const sc=weekTotals.get(p)||0;
+        if(sc<min){min=sc; pick=p;}
+      }
+      weekTotals.set(pick,(weekTotals.get(pick)||0)+(it.weight||0));
+      return {...it,owner:pick};
+    });
+  }
+
+  // --------- Render ---------
+  function renderAll(){
+    normalizeData();
+
+    const m=monthKey();
+    monthPill.textContent='Month: '+m;
+
+    const now=Date.now();
+    const due=getDueTasks();
+    const openIds=Object.keys(state.open||{});
+    const openTasks=openIds.map(id=> getTaskById(id)).filter(Boolean);
+
+    // Month stats
+    const hist=(state.months[m] && state.months[m].history) ? state.months[m].history : [];
+    const assignedWeight=hist.reduce((s,h)=>s+(h.total||0),0);
+
+    // done weight this month: sum of weights for tasks whose lastDoneTs is within this month
+    const monthStart=new Date(m+'-01T00:00:00');
+    const doneIds=[];
+    let doneWeight=0;
+    for(const c of chores){
+      const ld=(state.meta[c.id] && state.meta[c.id].lastDoneTs) ? state.meta[c.id].lastDoneTs : 0;
+      if(ld && ld>=monthStart.getTime() && ld<=now){
+        doneIds.push(c.id);
+        doneWeight += (c.weight||0);
+      }
+    }
+
+    const backlogWeight = openTasks.reduce((s,t)=>s+(t.weight||0),0) + due.reduce((s,t)=>s+(t.weight||0),0);
+    const progress = (doneWeight + backlogWeight) > 0 ? (doneWeight/(doneWeight+backlogWeight)) : 0;
+    progressBar.style.width = Math.round(progress*100)+'%';
+
+    monthStats.textContent = 'Done '+doneWeight.toFixed(1)+' wt • Outstanding '+openTasks.length+' • Due '+due.length+' • Assigned '+assignedWeight.toFixed(1)+' wt';
+
+    // Outstanding
+    outstandingEl.innerHTML='';
+    outstandingMeta.textContent = openTasks.length ? (openTasks.length+' tasks') : 'None 🎉';
+    openTasks
+      .sort((a,b)=>(state.open[a.id].assignedTs||0)-(state.open[b.id].assignedTs||0))
+      .forEach(t=> outstandingEl.appendChild(taskCard(t, {mode:'outstanding'})));
+
+    // Completed (this month)
+    completedEl.innerHTML='';
+    const doneLog = Array.isArray(state.doneLog) ? state.doneLog : [];
+    const doneThisMonth = doneLog
+      .filter(ev=>ev && typeof ev.ts==='number' && ev.ts>=monthStart.getTime() && ev.ts<=now)
+      .sort((a,b)=>b.ts-a.ts);
+
+    // Prefer log, but if empty (e.g., older usage), fall back to meta.lastDoneTs this month
+    let latestById = new Map();
+    if(doneThisMonth.length){
+      for(const ev of doneThisMonth){
+        if(!latestById.has(ev.id)) latestById.set(ev.id, ev);
+      }
+    } else {
+      const fall = [];
+      for(const c of chores){
+        const ld=(state.meta[c.id] && state.meta[c.id].lastDoneTs) ? state.meta[c.id].lastDoneTs : 0;
+        if(ld && ld>=monthStart.getTime() && ld<=now){
+          fall.push({ ts: ld, id: c.id, name: c.name, weight: c.weight, owner: '' });
+        }
+      }
+      fall.sort((a,b)=>b.ts-a.ts);
+      for(const ev of fall){
+        if(!latestById.has(ev.id)) latestById.set(ev.id, ev);
+      }
+    }
+
+    const completedList = Array.from(latestById.values()).sort((a,b)=>b.ts-a.ts);
+    completedMeta.textContent = completedList.length ? (completedList.length+' completed this month') : 'None yet';
+    completedList.slice(0,12).forEach(ev=>{
+      const t=getTaskById(ev.id);
+      if(t) completedEl.appendChild(taskCard({...t, owner: ev.owner, _completedTs: ev.ts}, {mode:'completed'}));
+    });
+
+    // Last batch
+    lastDrawEl.innerHTML='';
+    const last = hist[hist.length-1] || null;
+    lastDrawMeta.textContent = last ? (last.items.length+' tasks • '+new Date(last.ts).toLocaleString([], {month:'short', day:'numeric'}) ) : '—';
+    (last ? last.items : []).forEach(it=>{
+      const t=getTaskById(it.id);
+      if(t) lastDrawEl.appendChild(taskCard({...t, owner: it.owner}, {mode:'last'}));
+    });
+
+    // Due list
+    dueEl.innerHTML='';
+    dueMeta.textContent = due.length ? (due.length+' due') : 'None due right now';
+    due
+      .sort((a,b)=> nextDueTs(a)-nextDueTs(b))
+      .forEach(t=> dueEl.appendChild(taskCard(t, {mode:'due'})));
+
+    renderTable();
+  }
+
+  function taskCard(t, opts){
+    const mode = (opts && opts.mode) ? opts.mode : 'due';
+    const meta = state.meta[t.id] || {};
+    const ld = meta.lastDoneTs || 0;
+    const snoozeUntil = meta.snoozeUntilTs || 0;
+    const dueTs = nextDueTs(t);
+    const now = Date.now();
+
+    const badge = (function(){
+      if(snoozeUntil && now < snoozeUntil) return '<span class="badge snoozed">Snoozed</span>';
+      if(mode==='outstanding') return '<span class="badge overdue">Outstanding</span>';
+      if(mode==='completed') return '<span class="badge due">Completed</span>';
+      if(isDueNow(t, now)) return '<span class="badge due">Due</span>';
+      return '<span class="badge">Not due</span>';
+    })();
+
+    const div=document.createElement('div');
+    div.className='task-card';
+
+    const line1 = '<h3 class="task-title">'+escapeHtml(t.name)+'</h3>';
+
+    const line2 = '<div class="muted">'
+      +'Weight <b>'+(t.weight||0).toFixed(1)+'</b>'
+      +' • Cadence <b>'+clampNum(t.cadenceDays,1,365,DEFAULT_CADENCE_DAYS)+'</b>d'
+      +(t.owner ? ' • <span class="owner-badge">'+escapeHtml(t.owner)+'</span>' : '')
+      +' • '+badge
+      +'</div>';
+
+    const completedTs = (t && t._completedTs) ? t._completedTs : 0;
+    const line3 = '<div class="muted" style="margin-top:6px">'
+      +(mode==='completed' ? ('Completed: <b>'+new Date(completedTs || ld || 0).toLocaleString([], {month:'short', day:'numeric'})+'</b> • ') : '')
+      +'Last done: <b>'+(ld? fmtAgo(ld) : 'never')+'</b>'
+      +' • Next due: <b>'+fmtIn(dueTs)+'</b>'
+      +'</div>';
+
+    const tags = (t.tags||[]).map(tag=>'<span class="pill">'+escapeHtml(tag)+'</span>').join('');
+
+    const actions=document.createElement('div');
+    actions.className='actions';
+
+    // actions differ by mode
+    const doneBtn = mkBtn('Mark done', 'btn sm success', ()=>markDone(t.id));
+    const snooze7 = mkBtn('Snooze 7d', 'btn sm secondary', ()=>snooze(t.id, 7));
+    const snooze14 = mkBtn('Snooze 14d', 'btn sm secondary', ()=>snooze(t.id, 14));
+
+    if(mode==='outstanding' || mode==='last' || mode==='due'){
+      actions.appendChild(doneBtn);
+      actions.appendChild(snooze7);
+      actions.appendChild(snooze14);
+    }
+    if(mode==='completed'){
+      actions.appendChild(mkBtn('Mark not done', 'btn sm danger', ()=>markNotDone(t.id)));
+    }
+
+    div.innerHTML = line1 + line2 + line3 + '<div class="badges">'+tags+'</div>';
+    div.appendChild(actions);
+
+    return div;
+  }
+
+  function renderTable(){
+    tableBody.innerHTML='';
+    const now=Date.now();
+
+    chores.forEach((c, i)=>{
+      const tr=document.createElement('tr');
+      const meta=state.meta[c.id] || {};
+      const ld=meta.lastDoneTs || 0;
+      const nd=nextDueTs(c);
+
+      tr.innerHTML =
+        '<td><input type="text" value="'+escapeHtml(c.name)+'" data-k="name" data-i="'+i+'" /></td>'+
+        '<td><input type="number" step="0.5" value="'+c.weight+'" data-k="weight" data-i="'+i+'" /></td>'+
+        '<td><input type="number" step="1" value="'+clampNum(c.cadenceDays,1,365,DEFAULT_CADENCE_DAYS)+'" data-k="cadenceDays" data-i="'+i+'" /></td>'+
+        '<td><input type="checkbox" '+(c.enabled!==false?'checked':'')+' data-k="enabled" data-i="'+i+'" /></td>'+
+        '<td><input type="text" value="'+escapeHtml((c.tags||[]).join(', '))+'" data-k="tags" data-i="'+i+'" /></td>'+
+        '<td class="muted">'+(ld? new Date(ld).toLocaleDateString()+' ('+fmtAgo(ld)+')' : 'never')+'</td>'+
+        '<td class="muted">'+(nd? new Date(nd).toLocaleDateString()+' ('+fmtIn(nd)+')' : '—')+'</td>'+
+        '<td>'
+          +'<button class="btn sm success" data-done="'+escapeHtml(c.id)+'">Done</button> '
+          +'<button class="btn sm secondary" data-snooze="'+escapeHtml(c.id)+'" data-days="7">Snooze 7d</button> '
+          +'<button class="btn sm danger" data-del="'+i+'">Delete</button>'
+        +'</td>';
+
+      tableBody.appendChild(tr);
+    });
+
+    // inputs
+    tableBody.querySelectorAll('input[type=text],input[type=number]').forEach(inp=>{
+      inp.addEventListener('change', e=>{
+        const i=+e.target.dataset.i;
+        const k=e.target.dataset.k;
+        const v=e.target.value;
+        if(k==='weight') chores[i].weight = clampNum(v, 0.5, 99, 1);
+        else if(k==='cadenceDays') chores[i].cadenceDays = clampNum(v, 1, 365, DEFAULT_CADENCE_DAYS);
+        else if(k==='tags') chores[i].tags = String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
+        else if(k==='name') { chores[i].name = String(v||''); chores[i].id = slug(chores[i].id || chores[i].name); }
+        save(LS_DATA, chores);
+        renderAll();
+      });
+    });
+
+    // enabled checkbox
+    tableBody.querySelectorAll('input[type=checkbox][data-k=enabled]').forEach(chk=>{
+      chk.addEventListener('change', e=>{
+        const i=+e.target.dataset.i;
+        chores[i].enabled = !!e.target.checked;
+        save(LS_DATA, chores);
+        renderAll();
+      });
+    });
+
+    // done/snooze/delete buttons
+    tableBody.querySelectorAll('button[data-done]').forEach(btn=>{
+      btn.addEventListener('click', e=> markDone(e.target.dataset.done));
+    });
+    tableBody.querySelectorAll('button[data-snooze]').forEach(btn=>{
+      btn.addEventListener('click', e=> snooze(e.target.dataset.snooze, +e.target.dataset.days || 7));
+    });
+    tableBody.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        const idx=+e.target.dataset.del;
+        if(!confirm('Delete "'+chores[idx].name+'"?')) return;
+        const id=chores[idx].id;
+        chores.splice(idx,1);
+        delete state.open[id];
+        delete state.meta[id];
+        save(LS_DATA, chores);
+        save(LS_STATE, state);
+        renderAll();
+      });
+    });
+  }
+
+  // --------- Manage chores / Import / Export ---------
+  function addChore(){
+    const name=($('#newName').value||'').trim();
+    const weight=parseFloat($('#newWeight').value||'');
+    const cadence=parseInt($('#newCadence').value||'',10);
+    const tags=($('#newTags').value||'').split(',').map(t=>t.trim()).filter(Boolean);
+
+    if(!name || isNaN(weight) || weight<=0){ alert('Enter a name and positive weight.'); return; }
+    const id=slug(name);
+    const cadenceDays = clampNum(isNaN(cadence)?DEFAULT_CADENCE_DAYS:cadence, 1, 365, DEFAULT_CADENCE_DAYS);
+
+    if(chores.some(c=>c.id===id)) { alert('A chore with this name already exists.'); return; }
+
+    chores.push({id,name,weight:clampNum(weight,0.5,99,1),cadenceDays,tags,enabled:true});
+    save(LS_DATA, chores);
+
+    $('#newName').value='';
+    $('#newWeight').value='';
+    $('#newCadence').value='';
+    $('#newTags').value='';
+
+    renderAll();
+  }
+
   function exportJSON(){
     try{
-      const payload={version:1, chores:chores};
+      const payload={version:2, chores, state};
       const data=JSON.stringify(payload,null,2);
       const blob=new Blob([data],{type:'application/json'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
-      a.href=url; a.download='chores-'+monthKey()+'.json';
-      document.body.appendChild(a); a.click(); a.remove();
+      a.href=url;
+      a.download='chores-'+monthKey()+'-v2.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       URL.revokeObjectURL(url);
-    }catch(err){ console.error('Export failed:',err); alert('Export failed: '+(err&&err.message||err)); }
+    }catch(err){ console.error(err); alert('Export failed: '+(err&&err.message||err)); }
   }
+
   async function importJSON(e){
-    const file=(e&&e.target&&e.target.files&&e.target.files[0])||null; if(!file) return;
+    const file=(e && e.target && e.target.files && e.target.files[0]) || null;
+    if(!file) return;
     try{
       const text=await file.text();
       const json=JSON.parse(text);
-      const src=Array.isArray(json)?json:(Array.isArray(json.chores)?json.chores:null);
-      if(!src) throw new Error('JSON must be an array of chores or {"chores": [...]}');
-      const seen=new Set(); const cleaned=[];
-      for(const c of src){ if(!c) continue; const name=String(c.name||'').trim(); let weight=parseFloat(c.weight); if(!name||isNaN(weight)||weight<=0) continue; const id=slug(c.id||name); if(seen.has(id)) continue; seen.add(id); const tags=Array.isArray(c.tags)?c.tags.filter(Boolean):[]; cleaned.push({id,name,weight:Math.max(0.5,weight),tags}); }
+      const srcChores = Array.isArray(json) ? json : (Array.isArray(json.chores)?json.chores:null);
+      if(!srcChores) throw new Error('JSON must be an array of chores or {"chores": [...]}');
+
+      const seen=new Set();
+      const cleaned=[];
+      for(const c of srcChores){
+        if(!c) continue;
+        const name=String(c.name||'').trim();
+        const weight=parseFloat(c.weight);
+        const cadenceDays=clampNum(c.cadenceDays ?? c.cadence_days ?? c.cadence, 1, 365, DEFAULT_CADENCE_DAYS);
+        if(!name || isNaN(weight) || weight<=0) continue;
+        const id=slug(c.id||name);
+        if(seen.has(id)) continue;
+        seen.add(id);
+        const tags=Array.isArray(c.tags)?c.tags.filter(Boolean):[];
+        const enabled=(c.enabled===false)?false:true;
+        cleaned.push({id,name,weight:clampNum(weight,0.5,99,1),cadenceDays,tags,enabled});
+      }
       if(!cleaned.length) throw new Error('No valid chores found.');
-      chores=cleaned; save(LS_DATA,chores);
-      // Keep current month but drop used items no longer present
-      ensureMonthState(); const m=monthKey(); state[m].used=(state[m].used||[]).filter(id=>chores.some(c=>c.id===id)); save(LS_STATE,state);
+
+      chores=cleaned;
+      save(LS_DATA, chores);
+
+      // If file includes state, merge meta/open if compatible
+      if(json && json.state && typeof json.state==='object'){
+        state.meta = json.state.meta || state.meta || {};
+        state.open = json.state.open || state.open || {};
+        // keep months but ensure current exists
+        state.months = json.state.months || state.months || {};
+        const m=monthKey();
+        if(!state.months[m]) state.months[m] = { history: [] };
+        save(LS_STATE, state);
+      }
+
+      normalizeData();
       renderAll();
       alert('Imported '+cleaned.length+' chores.');
-    }catch(err){ console.error('Import failed:',err); alert('Import failed: '+(err&&err.message||err)); }
-    finally{ if(e&&e.target) e.target.value=''; }
+    }catch(err){ console.error(err); alert('Import failed: '+(err&&err.message||err)); }
+    finally{ if(e && e.target) e.target.value=''; }
   }
 
-  // ==== Core helpers ====
-  function ensureMonthState(){ const m=monthKey(); if(!state[m]) state[m]={used:[],history:[]}; const keys=Object.keys(state).filter(k=>k.length===7&&k[4]==='-'&&isYearMonth(k)); keys.sort(); while(keys.length>6){ delete state[keys.shift()]; } save(LS_STATE,state); }
-  function isYearMonth(k){ const y=k.slice(0,4), mm=k.slice(5,7); const yi=+y, mi=+mm; return !isNaN(yi) && !isNaN(mi) && mi>=1 && mi<=12; }
-  function remainingPool(){ const m=monthKey(); const used=new Set(state[m].used); return chores.filter(c=>!used.has(c.id)); }
-  function getCap(){ const v=parseFloat(capInput.value); return Math.max(0.5, isNaN(v)?8:v); }
-  function readPeople(){ return peopleInput.value.split(',').map(s=>s.trim()).filter(Boolean); }
+  // --------- Animation ---------
+  function animateDraw(items){
+    return new Promise(async resolve=>{
+      const overlay=document.getElementById('drawOverlay');
+      const list=document.getElementById('drawList');
+      const meta=document.getElementById('drawMeta');
+      const skipBtn=document.getElementById('skipDraw');
+      const drawBtn=document.getElementById('drawBtn');
 
-  function pickWeeklySet(pool,cap,people){ return (people.length===2)? optimizeWeeklySubset2(pool,cap,people) : drawToCapRandom(pool,cap); }
-  function drawToCapRandom(pool,cap){ const remaining=pool.slice(); const picked=[]; let total=0; let guard=1000; while(guard--&&remaining.length){ const feasible=remaining.filter(t=> total+(t.weight||0) <= cap); if(!feasible.length) break; const chosen=weightedPick(feasible); picked.push(chosen); total+=(chosen.weight||0); const idx=remaining.findIndex(x=>x.id===chosen.id); if(idx>-1) remaining.splice(idx,1);} return picked; }
-  function weightedPick(list){ const tot=list.reduce((s,t)=>s+(t.weight||1),0); let r=Math.random()*tot; for(const it of list){ r-= (it.weight||1); if(r<=0) return it; } return list[list.length-1]; }
+      meta.textContent = items.length+' task'+(items.length!==1?'s':'')+' • cap '+getCap();
+      list.innerHTML='';
+      overlay.classList.add('show');
+      overlay.setAttribute('aria-hidden','false');
+      if(drawBtn) drawBtn.disabled=true;
 
-  // Optimizer to honor ±0.5 weekly fairness where feasible, then maximize cap usage, then improve month balance
-  function optimizeWeeklySubset2(pool,cap,people){
-    const A=people[0], B=people[1]; const capU=Math.max(1,Math.floor(cap*2));
-    const mt=getMonthTotals(people); const mA=mt.get(A)||0, mB=mt.get(B)||0; const T=Math.round(WEEK_TOL*2);
-    const items=pool.map((it,idx)=>({it,idx,wU:Math.max(1,Math.round((it.weight||0)*2))})).filter(x=>x.wU<=capU);
-    let best=null;
-    function better(a,b){ if(!a) return true; if(a.hasTol!==b.hasTol) return b.hasTol; if(a.capGap!==b.capGap) return b.capGap<a.capGap; if(Math.abs(a.monthDelta-b.monthDelta)>1e-9) return b.monthDelta<a.monthDelta; if(a.weekDiffU!==b.weekDiffU) return b.weekDiffU<a.weekDiffU; if(a.sumU!==b.sumU) return b.sumU>a.sumU; return false; }
-    function evalSubset(sumU,dp,mask){ if(sumU===0) return; const sumW=sumU/2; let local=null; for(let sU=0;sU<=sumU;sU++){ if(!(((dp>>sU)&1)===1)) continue; const weekDiffU=Math.abs(sumU-2*sU); const s=sU/2; const monthDelta=Math.abs((mA+s)-(mB+(sumW-s))); const cand={hasTol:weekDiffU<=T,weekDiffU,monthDelta,capGap:(capU-sumU),sumU,mask}; if(!local||cand.monthDelta<local.monthDelta-1e-9||(Math.abs(cand.monthDelta-local.monthDelta)<=1e-9&&cand.weekDiffU<local.weekDiffU-1e-9)) local=cand; } if(better(best,local)) best=local; }
-    function dfs(i,sumU,dp,mask){ if(sumU>capU) return; if(mask) evalSubset(sumU,dp,mask); if(i>=items.length) return; const wU=items[i].wU; dfs(i+1,sumU+wU,(dp<<wU)|dp,mask|(1<<i)); dfs(i+1,sumU,dp,mask); }
-    dfs(0,0,1,0); if(!best){ return drawToCapRandom(pool,cap); }
-    const out=[]; for(let i=0;i<items.length;i++){ if((best.mask&(1<<i))!==0) out.push(items[i].it); } return out;
+      let skipped=false;
+      const onSkip=()=>{ skipped=true; };
+      skipBtn.addEventListener('click', onSkip, { once:true });
+
+      const names=getDueTasks().map(c=>c.name);
+      if(!names.length) chores.forEach(c=>names.push(c.name));
+      const people=readPeople();
+
+      for(let i=0;i<items.length;i++){
+        const card=document.createElement('div');
+        card.className='draw-item';
+        const roller=document.createElement('div');
+        roller.className='roller';
+        roller.textContent='Rolling…';
+        const note=document.createElement('div');
+        note.className='muted';
+        note.textContent='Picking next chore';
+        card.appendChild(roller);
+        card.appendChild(note);
+        list.appendChild(card);
+        list.scrollTop=list.scrollHeight;
+
+        if(!skipped){
+          const tick=75;
+          const dur=1100+Math.random()*700;
+          const int=setInterval(()=>{ roller.textContent = names[Math.floor(Math.random()*names.length)] || '…'; }, tick);
+          await sleep(dur);
+          clearInterval(int);
+        }
+
+        roller.classList.add('final');
+        roller.textContent = items[i].name;
+        note.textContent = 'Weight '+(items[i].weight||0).toFixed(1);
+        card.style.animation='pop .45s ease';
+        burstConfetti(card, 14);
+
+        if(!skipped) await sleep(350);
+
+        const ownerLine=document.createElement('div');
+        ownerLine.className='owner-line';
+        const ownerRoll=document.createElement('div');
+        ownerRoll.className='roller';
+        ownerRoll.textContent='Assigning…';
+        ownerLine.appendChild(ownerRoll);
+        card.appendChild(ownerLine);
+
+        if(people.length && !skipped){
+          const oTick=110;
+          const oDur=650+Math.random()*450;
+          const oi=setInterval(()=>{ ownerRoll.textContent = people[Math.floor(Math.random()*people.length)] || '…'; }, oTick);
+          await sleep(oDur);
+          clearInterval(oi);
+        }
+
+        ownerRoll.classList.add('final');
+        ownerRoll.textContent = items[i].owner || '—';
+        burstConfetti(card, 10);
+
+        if(!skipped) await sleep(220);
+      }
+
+      await sleep(250);
+      overlay.classList.remove('show');
+      overlay.setAttribute('aria-hidden','true');
+      if(drawBtn) drawBtn.disabled=false;
+      resolve();
+    });
   }
 
-  function getMonthTotals(people){ const m=monthKey(); const totals=new Map(); people.forEach(p=>totals.set(p,0)); const hist=state[m].history||[]; for(const h of hist){ for(const it of h.items){ if(it.owner && totals.has(it.owner)){ totals.set(it.owner,(totals.get(it.owner)||0)+(it.weight||0)); } } } return totals; }
-
-  function fairAssign(items,people){
-    if(!people.length) return items.map(i=>({ ...i, owner: undefined })); if(people.length===1) return items.map(i=>({ ...i, owner: people[0] }));
-    if(people.length===2){ const A=people[0], B=people[1]; const mt=getMonthTotals(people); const mA=mt.get(A)||0, mB=mt.get(B)||0; const weights=items.map(i=>i.weight||0); const W=weights.reduce((s,w)=>s+w,0); const n=items.length; if(n<=26){ let bestMask=0; let best={hasTol:false,weekDiff:1e9,monthDelta:1e9,targetDiff:1e9}; const target=(W-(mA-mB))/2; for(let mask=0; mask<(1<<n); mask++){ let s=0; for(let i=0;i<n;i++){ if((mask&(1<<i))!==0) s+=weights[i]; } const weekDiff=Math.abs(W-2*s); const hasTol=weekDiff<=WEEK_TOL+1e-9; const monthDelta=Math.abs((mA+s)-(mB+(W-s))); const tdiff=Math.abs(target-s); const cand={hasTol,weekDiff,monthDelta,targetDiff:tdiff}; const better=(cand.hasTol&&!best.hasTol)||(cand.hasTol===best.hasTol&&cand.monthDelta<best.monthDelta-1e-9)||(cand.hasTol===best.hasTol&&Math.abs(cand.monthDelta-best.monthDelta)<=1e-9&&cand.weekDiff<best.weekDiff-1e-9)||(cand.hasTol===best.hasTol&&Math.abs(cand.monthDelta-best.monthDelta)<=1e-9&&Math.abs(cand.weekDiff-best.weekDiff)<=1e-9&&cand.targetDiff<best.targetDiff-1e-9); if(better){best=cand; bestMask=mask;} } return items.map((it,i)=>({ ...it, owner: ((bestMask&(1<<i))!==0)?A:B })); }
-      const totals=new Map([[A,mA],[B,mB]]); const weekTotals=new Map([[A,0],[B,0]]); return [...items].sort((a,b)=>(b.weight||0)-(a.weight||0)).map(it=>{ let pick=A, min=1e9; [A,B].forEach(p=>{ const sc=(totals.get(p)||0)+(weekTotals.get(p)||0); if(sc<min){min=sc;pick=p;} }); weekTotals.set(pick,(weekTotals.get(p)||0)+(it.weight||0)); return { ...it, owner: pick }; }); }
-    const mt=getMonthTotals(people); const weekTotals=new Map(); people.forEach(p=>weekTotals.set(p,0)); return [...items].sort((a,b)=>(b.weight||0)-(a.weight||0)).map(it=>{ let pick=people[0], min=1e9; for(const p of people){ const sc=(mt.get(p)||0)+(weekTotals.get(p)||0); if(sc<min){min=sc;pick=p;} } weekTotals.set(pick,(weekTotals.get(p)||0)+(it.weight||0)); return { ...it, owner: pick }; });
+  function burstConfetti(target,count){
+    const n=count||24;
+    for(let i=0;i<n;i++){
+      const p=document.createElement('i');
+      p.className='confetti';
+      const hue=Math.floor(Math.random()*360);
+      p.style.background='hsl('+hue+' 80% 60%)';
+      const dx=(Math.random()*220)-110;
+      p.style.setProperty('--dx', dx.toFixed(1)+'px');
+      p.style.left=(50+(Math.random()*20-10))+'%';
+      p.style.animationDuration=(1.2+Math.random()*0.8)+'s';
+      target.appendChild(p);
+      setTimeout(()=>p.remove(), 2200);
+    }
   }
 
-  // ==== Render ====
-  function renderAll(){ ensureMonthState(); const m=monthKey(); monthPill.textContent='Month: '+m; const pool=remainingPool(); const usedCount=chores.length-pool.length; const usedW=chores.reduce((s,t)=>s+((state[m].used||[]).indexOf(t.id)>-1?(t.weight||0):0),0); const totalW=chores.reduce((s,t)=>s+(t.weight||0),0); const pct=totalW?Math.round((usedW/totalW)*100):0; progressBar.style.width=pct+'%'; const people=readPeople(); const mt=getMonthTotals(people); const vals=people.map(p=>mt.get(p)||0); const delta=vals.length>1? (Math.max.apply(null,vals)-Math.min.apply(null,vals)).toFixed(1) : '0.0'; monthStats.textContent=usedCount+'/'+chores.length+' tasks • '+usedW.toFixed(1)+'/'+totalW.toFixed(1)+' weight ('+pct+'%)'+(people.length? ' • '+people.map(p=>p+' '+(mt.get(p)||0).toFixed(1)).join(' • ')+' (Δ '+delta+')':'' ); lastDrawEl.innerHTML=''; const last=(state[m].history[state[m].history.length-1]||null); lastDrawMeta.textContent=last? (last.items.length+' tasks • weight '+last.total.toFixed(1)) : '—'; (last? last.items: []).forEach(t=> lastDrawEl.appendChild(taskCard(t,true)) ); remainingEl.innerHTML=''; pool.sort((a,b)=>b.weight-a.weight).forEach(t=> remainingEl.appendChild(taskCard(t,false))); const remW=pool.reduce((s,t)=>s+(t.weight||0),0); remainingMeta.textContent=pool.length+' tasks • total weight '+remW.toFixed(1); renderTable(); }
-  function taskCard(t,showOwner){ const d=document.createElement('div'); d.className='task-card'; d.innerHTML='<h3 class="task-title">'+escapeHtml(t.name)+'</h3><div class="muted">Weight <b>'+(t.weight||0).toFixed(1)+'</b>'+(showOwner&&t.owner? ' • <span class="owner-badge">'+escapeHtml(t.owner)+'</span>' : '')+'</div><div class="badges">'+(t.tags||[]).map(tag=>'<span class="pill">'+escapeHtml(tag)+'</span>').join('')+'</div>'; return d; }
-  function renderTable(){ tableBody.innerHTML=''; chores.forEach((c,i)=>{ const tr=document.createElement('tr'); tr.innerHTML='<td><input type="text" value="'+escapeHtml(c.name)+'" data-k="name" data-i="'+i+'"></td><td><input type="number" step="0.5" value="'+c.weight+'" data-k="weight" data-i="'+i+'"></td><td><input type="text" value="'+(c.tags||[]).join(', ')+'" data-k="tags" data-i="'+i+'"></td><td><button class="btn secondary" data-del="'+i+'">Delete</button></td>'; tableBody.appendChild(tr); }); tableBody.querySelectorAll('input').forEach(inp=>{ inp.addEventListener('change',e=>{ const i=parseInt(e.target.dataset.i,10); const k=e.target.dataset.k; const v=e.target.value; if(k==='weight'){ chores[i][k]=Math.max(0.5, parseFloat(v)||1); } else if(k==='tags'){ chores[i][k]=v.split(',').map(x=>x.trim()).filter(Boolean); } else { chores[i][k]=v; chores[i].id=slug(chores[i].name); } save(LS_DATA,chores); renderAll(); }); }); tableBody.querySelectorAll('button[data-del]').forEach(btn=>{ btn.addEventListener('click',e=>{ const i=parseInt(e.target.dataset.del,10); if(confirm('Delete "'+chores[i].name+'"?')){ const id=chores[i].id; chores.splice(i,1); const m=monthKey(); state[m].used=(state[m].used||[]).filter(x=>x!==id); save(LS_DATA,chores); save(LS_STATE,state); renderAll(); } }); }); }
+  function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-  // ==== Animations ====
-  function animateDraw(items){ return new Promise(async resolve=>{ const overlay=document.getElementById('drawOverlay'); const list=document.getElementById('drawList'); const meta=document.getElementById('drawMeta'); const skipBtn=document.getElementById('skipDraw'); const drawBtn=document.getElementById('drawBtn'); meta.textContent=items.length+' task'+(items.length!==1?'s':'')+' • cap '+getCap(); list.innerHTML=''; overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false'); if(drawBtn) drawBtn.disabled=true; let skipped=false; const onSkip=()=>{skipped=true}; skipBtn.addEventListener('click',onSkip,{once:true}); const names=remainingPool().map(c=>c.name); if(!names.length) defaultChores.forEach(c=>names.push(c.name)); const people=readPeople(); for(let i=0;i<items.length;i++){ const card=document.createElement('div'); card.className='draw-item'; const roller=document.createElement('div'); roller.className='roller'; roller.textContent='Rolling…'; const note=document.createElement('div'); note.className='muted'; note.textContent='Picking next chore'; card.appendChild(roller); card.appendChild(note); list.appendChild(card); list.scrollTop=list.scrollHeight; if(!skipped){ const tick=75; const dur=1600+Math.random()*900; const int=setInterval(()=>{ const r=Math.floor(Math.random()*names.length); roller.textContent=names[r]||'…'; },tick); await sleep(dur); clearInterval(int); } roller.classList.add('final'); roller.textContent=items[i].name; note.textContent='Weight '+(items[i].weight||0).toFixed(1); card.style.animation='pop .45s ease'; burstConfetti(card,18); if(!skipped){ await sleep(450); } const ownerLine=document.createElement('div'); ownerLine.className='owner-line'; const ownerRoll=document.createElement('div'); ownerRoll.className='roller'; ownerRoll.textContent='Assigning…'; ownerLine.appendChild(ownerRoll); card.appendChild(ownerLine); list.scrollTop=list.scrollHeight; if(people.length&&!skipped){ const oTick=100; const oDur=900+Math.random()*600; const oi=setInterval(()=>{ const rr=Math.floor(Math.random()*people.length); ownerRoll.textContent=people[rr]||'…'; },oTick); await sleep(oDur); clearInterval(oi);} ownerRoll.classList.add('final'); ownerRoll.textContent=items[i].owner||'—'; burstConfetti(card,12); if(skipped){ for(let j=i+1;j<items.length;j++){ const c2=document.createElement('div'); c2.className='draw-item'; const r2=document.createElement('div'); r2.className='roller final'; r2.textContent=items[j].name; const n2=document.createElement('div'); n2.className='muted'; n2.textContent='Weight '+(items[j].weight||0).toFixed(1); const oLine=document.createElement('div'); oLine.className='owner-line'; const oVal=document.createElement('span'); oVal.className='owner-badge'; oVal.textContent=items[j].owner||'—'; oLine.appendChild(oVal); c2.appendChild(r2); c2.appendChild(n2); c2.appendChild(oLine); list.appendChild(c2);} break; } } await sleep(350); overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); if(drawBtn) drawBtn.disabled=false; resolve(); }); }
-  function burstConfetti(target,count){ const n=count||24; for(let i=0;i<n;i++){ const p=document.createElement('i'); p.className='confetti'; const hue=Math.floor(Math.random()*360); p.style.background='hsl('+hue+' 80% 60%)'; const dx=(Math.random()*220)-110; p.style.setProperty('--dx',dx.toFixed(1)+'px'); p.style.left=(50+(Math.random()*20-10))+'%'; p.style.animationDuration=(1.2+Math.random()*0.8)+'s'; target.appendChild(p); setTimeout(function(){ p.remove(); },2200);} }
-  const sleep=function(ms){ return new Promise(function(r){ setTimeout(r,ms); }); };
-
-  // ==== Storage & utils ====
-  function load(k){ try{ return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } }
+  // --------- Utils ---------
+  function load(k){ try{ return JSON.parse(localStorage.getItem(k)); } catch{ return null; } }
   function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
-  function slug(s){ s=String(s).toLowerCase(); var out=''; var lastDash=false; for(var i=0;i<s.length;i++){ var c=s[i]; var ok=(c>='a'&&c<='z')||(c>='0'&&c<='9'); if(ok){ out+=c; lastDash=false; } else if(!lastDash){ out+='-'; lastDash=true; } } while(out.length&&out[0]==='-') out=out.slice(1); while(out.length&&out[out.length-1]==='-') out=out.slice(0,-1); return out; }
-  function escapeHtml(s){ s=String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[c];}); return s; }
 
-  function addChore(){ const name=($('#newName').value||'').trim(); const weight=parseFloat($('#newWeight').value||''); const tags=$('#newTags').value.split(',').map(function(t){return t.trim();}).filter(function(x){return x;}); if(!name||isNaN(weight)||weight<=0){ alert('Enter a name and positive weight.'); return; } const id=slug(name); chores.push({id:id,name:name,weight:Math.max(0.5,weight),tags:tags}); save(LS_DATA,chores); $('#newName').value=''; $('#newWeight').value=''; $('#newTags').value=''; renderAll(); }
+  function slug(s){
+    s=String(s||'').toLowerCase();
+    let out='';
+    let lastDash=false;
+    for(let i=0;i<s.length;i++){
+      const c=s[i];
+      const ok=(c>='a'&&c<='z')||(c>='0'&&c<='9');
+      if(ok){ out+=c; lastDash=false; }
+      else if(!lastDash){ out+='-'; lastDash=true; }
+    }
+    while(out.length && out[0]==='-') out=out.slice(1);
+    while(out.length && out[out.length-1]==='-') out=out.slice(0,-1);
+    return out || 'item';
+  }
 
-  // ==== Minimal self-tests (console only) ====
-  (function runSelfTests(){
-    const results=[]; const log=(n,p)=>{(p?console.log:console.warn)('[Test]',n,p?'✓':'✗')};
-    function assert(n,cond){ results.push({n,pass:!!cond}); log(n,!!cond); }
-    // T1: export function exists
-    assert('exportJSON defined', typeof exportJSON==='function');
-    // T2: import function exists
-    assert('importJSON defined', typeof importJSON==='function');
-    // T3: optimizer respects cap
-    (function(){ const pool=[{id:'a',weight:2},{id:'b',weight:2},{id:'c',weight:2}]; const picked=optimizeWeeklySubset2(pool,4,['A','B']); const sum=picked.reduce((s,t)=>s+(t.weight||0),0); assert('opt subset <= cap', sum<=4+1e-9); })();
-    // T4: fairAssign can meet ±0.5 when trivial
-    (function(){ const items=[{id:'x',weight:2},{id:'y',weight:2}]; const out=fairAssign(items,['A','B']); const a=out.filter(o=>o.owner==='A').reduce((s,t)=>s+t.weight,0); const b=out.filter(o=>o.owner==='B').reduce((s,t)=>s+t.weight,0); assert('weekly diff <= 0.5 in simple case', Math.abs(a-b)<=0.5+1e-9); })();
-    // T5: export payload shape
-    (function(){ const payload={version:1,chores:[{id:'t',name:'Test',weight:1}]}; const round=JSON.parse(JSON.stringify(payload)); assert('export payload has chores[]', Array.isArray(round.chores)&&round.chores.length===1); })();
-    const passed=results.filter(r=>r.pass).length; console.log(`[Self-tests] ${passed}/${results.length} passed`);
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+  }
+
+  function clampNum(v, min, max, fallback){
+    const n = (typeof v==='number') ? v : parseFloat(v);
+    if(isNaN(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  }
+
+  function getCap(){
+    const v=parseFloat(capInput.value);
+    return Math.max(0.5, isNaN(v)?8:v);
+  }
+
+  function readPeople(){
+    return peopleInput.value.split(',').map(s=>s.trim()).filter(Boolean);
+  }
+
+  function getTaskById(id){
+    return chores.find(c=>c.id===id) || null;
+  }
+
+  function fmtAgo(ts){
+    const d=Math.max(0, Math.floor((Date.now()-ts)/86400000));
+    if(d===0) return 'today';
+    if(d===1) return '1d ago';
+    return d+'d ago';
+  }
+
+  function fmtIn(ts){
+    const d=Math.floor((ts-Date.now())/86400000);
+    if(d<=0) return 'now';
+    if(d===1) return 'in 1d';
+    return 'in '+d+'d';
+  }
+
+  function mkBtn(text, cls, onClick){
+    const b=document.createElement('button');
+    b.className=cls;
+    b.type='button';
+    b.textContent=text;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  // --------- Minimal self-tests (console) ---------
+  (function tests(){
+    const assert=(name,cond)=>{(cond?console.log:console.warn)('[Test]',name,cond?'✓':'✗');};
+
+    // T1: completion persists and respects cadence
+    (function(){
+      const tmpId='__t_cadence';
+      const tmp={id:tmpId,name:'Tmp',weight:1,cadenceDays:7,tags:[],enabled:true};
+      chores.push(tmp);
+      if(!state.meta[tmpId]) state.meta[tmpId]={};
+      state.meta[tmpId].lastDoneTs = Date.now();
+      assert('T1 not due right after done', !isDueNow(tmp, Date.now()));
+      state.meta[tmpId].lastDoneTs = Date.now()-8*86400000;
+      assert('T1 due after cadence', isDueNow(tmp, Date.now()));
+      chores = chores.filter(c=>c.id!==tmpId);
+      delete state.meta[tmpId];
+    })();
+
+    // T2: open items excluded from due
+    (function(){
+      const id=chores[0].id;
+      state.open[id]={assignedTs:Date.now(),owner:'A'};
+      const dueIds=new Set(getDueTasks().map(x=>x.id));
+      assert('T2 open excluded from due', !dueIds.has(id));
+      delete state.open[id];
+    })();
+
+    // T3: exportJSON exists
+    assert('T3 exportJSON exists', typeof exportJSON==='function');
+
+    // T4: completion log records and markNotDone clears lastDone
+    (function(){
+      const tmpId='__t_done';
+      chores.push({id:tmpId,name:'Tmp Done',weight:1,cadenceDays:7,tags:[],enabled:true});
+      if(!state.meta[tmpId]) state.meta[tmpId]={};
+      delete state.meta[tmpId].lastDoneTs;
+      const before = Array.isArray(state.doneLog)? state.doneLog.length : 0;
+      markDone(tmpId);
+      const after = Array.isArray(state.doneLog)? state.doneLog.length : 0;
+      assert('T4 doneLog increments', after===before+1);
+      markNotDone(tmpId);
+      const cleared = !(state.meta[tmpId] && state.meta[tmpId].lastDoneTs);
+      assert('T4 markNotDone clears lastDone', cleared);
+      // cleanup
+      chores = chores.filter(c=>c.id!==tmpId);
+      delete state.meta[tmpId]; delete state.open[tmpId];
+      state.doneLog = (state.doneLog||[]).filter(ev=>ev && ev.id!==tmpId);
+    })();
+
+    save(LS_STATE,state);
   })();
 
 })();
 </script>
-</body></html>
+</body>
+</html>
