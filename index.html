@@ -1,4 +1,4 @@
-
+```html
 <!doctype html>
 <html lang="en">
 <head>
@@ -173,13 +173,66 @@
 
 <script>
 (function(){
-  const monthKey=()=>new Date().toISOString().slice(0,7);
+  const monthKey = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   const LS_DATA='choresDeck_v2_data';
   const LS_STATE='choresDeck_v2_state';
   const LS_OLD_DATA='choresDeck_v1_data';
   const LS_OLD_STATE='choresDeck_v1_state';
   const WEEK_TOL=0.5; // weekly fairness tolerance (±0.5)
   const DEFAULT_CADENCE_DAYS=30;
+
+  const MS_DAY = 86400000;
+
+  function firstSundayTs(year, monthIndex){
+    const d = new Date(year, monthIndex, 1, 0, 0, 0, 0);
+    const offset = (7 - d.getDay()) % 7; // 0..6 (Sun = 0)
+    return new Date(year, monthIndex, 1 + offset, 0, 0, 0, 0).getTime();
+  }
+
+  // Cycle start = first Sunday of the current month if we've reached it,
+  // otherwise first Sunday of the previous month.
+  function currentCycleStartTs(nowTs = Date.now()){
+    const now = new Date(nowTs);
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const thisMonth = firstSundayTs(y, m);
+    if (nowTs >= thisMonth) return thisMonth;
+
+    const prev = new Date(y, m, 0); // last day of prev month
+    return firstSundayTs(prev.getFullYear(), prev.getMonth());
+  }
+
+  function nextCycleStartTs(cycleStartTs){
+    const d = new Date(cycleStartTs);
+    const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    return firstSundayTs(nextMonth.getFullYear(), nextMonth.getMonth());
+  }
+
+  // Monthly-ish chores reset on the cycle boundary.
+  function isMonthlyLike(c){
+    return clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS) >= 28;
+  }
+
+  // When a new cycle begins, clear outstanding assignments from the previous cycle
+  // so they don’t block tasks from becoming due again.
+  function maybeRolloverCycle(nowTs = Date.now()){
+    const cycleStart = currentCycleStartTs(nowTs);
+
+    if (!state.cycleStartTs){
+      state.cycleStartTs = cycleStart;
+      return false;
+    }
+
+    if (cycleStart > state.cycleStartTs + 1000){
+      for (const [id, o] of Object.entries(state.open || {})){
+        if ((o && o.assignedTs ? o.assignedTs : 0) < cycleStart) delete state.open[id];
+      }
+      state.cycleStartTs = cycleStart;
+      return true;
+    }
+    return false;
+  }
 
   // Final list only (as requested earlier) - now with default cadenceDays
   // Defaults keep your original "monthly pool" feel by using cadenceDays=30 for everything.
@@ -277,6 +330,8 @@
     if(!state.doneLog) state.doneLog = [];
     const m=monthKey();
     if(!state.months[m]) state.months[m] = { history: [] };
+
+    maybeRolloverCycle();
 
     // Normalize chores
     chores = chores.map(c=>{
@@ -413,18 +468,36 @@
     const meta = state.meta[c.id] || {};
     const snoozeUntil = meta.snoozeUntilTs || 0;
     if(snoozeUntil && now < snoozeUntil) return false;
+
     const lastDone = meta.lastDoneTs || 0;
     if(!lastDone) return true;
+
+    if(isMonthlyLike(c)){
+      const cycleStart = currentCycleStartTs(now);
+      return lastDone < cycleStart;
+    }
+
     const cadenceDays = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
-    return (now - lastDone) >= cadenceDays*86400000;
+    return (now - lastDone) >= cadenceDays*MS_DAY;
   }
 
   function nextDueTs(c){
     const meta = state.meta[c.id] || {};
     const lastDone = meta.lastDoneTs || 0;
-    const cadenceDays = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
-    const due = lastDone ? (lastDone + cadenceDays*86400000) : Date.now();
     const snoozeUntil = meta.snoozeUntilTs || 0;
+    const now = Date.now();
+
+    let due;
+    if(!lastDone){
+      due = now;
+    } else if(isMonthlyLike(c)){
+      const cycleStart = currentCycleStartTs(now);
+      due = (lastDone < cycleStart) ? now : nextCycleStartTs(cycleStart);
+    } else {
+      const cadenceDays = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
+      due = lastDone + cadenceDays*MS_DAY;
+    }
+
     return Math.max(due, snoozeUntil);
   }
 
@@ -579,6 +652,8 @@
     monthPill.textContent='Month: '+m;
 
     const now=Date.now();
+    const cycleStart = currentCycleStartTs(now);
+
     const due=getDueTasks();
     const openIds=Object.keys(state.open||{});
     const openTasks=openIds.map(id=> getTaskById(id)).filter(Boolean);
@@ -587,13 +662,12 @@
     const hist=(state.months[m] && state.months[m].history) ? state.months[m].history : [];
     const assignedWeight=hist.reduce((s,h)=>s+(h.total||0),0);
 
-    // done weight this month: sum of weights for tasks whose lastDoneTs is within this month
-    const monthStart=new Date(m+'-01T00:00:00');
+    // done weight this cycle: sum of weights for tasks whose lastDoneTs is within this cycle
     const doneIds=[];
     let doneWeight=0;
     for(const c of chores){
       const ld=(state.meta[c.id] && state.meta[c.id].lastDoneTs) ? state.meta[c.id].lastDoneTs : 0;
-      if(ld && ld>=monthStart.getTime() && ld<=now){
+      if(ld && ld>=cycleStart && ld<=now){
         doneIds.push(c.id);
         doneWeight += (c.weight||0);
       }
@@ -612,14 +686,14 @@
       .sort((a,b)=>(state.open[a.id].assignedTs||0)-(state.open[b.id].assignedTs||0))
       .forEach(t=> outstandingEl.appendChild(taskCard(t, {mode:'outstanding'})));
 
-    // Completed (this month)
+    // Completed (this cycle)
     completedEl.innerHTML='';
     const doneLog = Array.isArray(state.doneLog) ? state.doneLog : [];
     const doneThisMonth = doneLog
-      .filter(ev=>ev && typeof ev.ts==='number' && ev.ts>=monthStart.getTime() && ev.ts<=now)
+      .filter(ev=>ev && typeof ev.ts==='number' && ev.ts>=cycleStart && ev.ts<=now)
       .sort((a,b)=>b.ts-a.ts);
 
-    // Prefer log, but if empty (e.g., older usage), fall back to meta.lastDoneTs this month
+    // Prefer log, but if empty (e.g., older usage), fall back to meta.lastDoneTs this cycle
     let latestById = new Map();
     if(doneThisMonth.length){
       for(const ev of doneThisMonth){
@@ -629,7 +703,7 @@
       const fall = [];
       for(const c of chores){
         const ld=(state.meta[c.id] && state.meta[c.id].lastDoneTs) ? state.meta[c.id].lastDoneTs : 0;
-        if(ld && ld>=monthStart.getTime() && ld<=now){
+        if(ld && ld>=cycleStart && ld<=now){
           fall.push({ ts: ld, id: c.id, name: c.name, weight: c.weight, owner: '' });
         }
       }
@@ -1100,6 +1174,22 @@
       chores = chores.filter(c=>c.id!==tmpId);
       delete state.meta[tmpId]; delete state.open[tmpId];
       state.doneLog = (state.doneLog||[]).filter(ev=>ev && ev.id!==tmpId);
+    })();
+
+    // T5: monthly-ish chores reset on first Sunday cycle boundary
+    (function(){
+      const now = Date.now();
+      const cycleStart = currentCycleStartTs(now);
+      const t = { id:'__t_month', cadenceDays:30, enabled:true };
+
+      if(!state.meta['__t_month']) state.meta['__t_month'] = {};
+      state.meta['__t_month'].lastDoneTs = cycleStart - 1;
+      assert('T5 monthly-ish due after cycle start', isDueNow(t, now) === true);
+
+      state.meta['__t_month'].lastDoneTs = cycleStart + 1;
+      assert('T5 monthly-ish not due if done this cycle', isDueNow(t, now) === false);
+
+      delete state.meta['__t_month'];
     })();
 
     save(LS_STATE,state);
