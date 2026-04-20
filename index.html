@@ -1,4 +1,3 @@
-```html
 <!doctype html>
 <html lang="en">
 <head>
@@ -18,8 +17,9 @@
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.05)}
     .controls,.row{display:flex;flex-wrap:wrap;gap:12px;align-items:end}
     label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
-    input[type=number],input[type=text]{background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;border-radius:10px;min-width:140px}
+    input[type=number],input[type=text],select{background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;border-radius:10px;min-width:140px}
     input[type=text]{min-width:220px}
+    select{min-width:120px}
     .btn{appearance:none;border:1px solid var(--border);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
     .btn.secondary{background:transparent;color:var(--text)}
     .btn.accent{background:var(--accent);color:#fff;border-color:transparent}
@@ -41,6 +41,7 @@
     .badge.overdue{border-color:rgba(239,68,68,.55);color:#ef4444}
     .badge.snoozed{border-color:rgba(245,158,11,.55);color:#f59e0b}
     .owner-badge{font-size:12px;padding:4px 8px;border-radius:8px;background:rgba(16,185,129,.14);color:#10b981;font-weight:800}
+    .owner-badge.muted-owner{background:rgba(107,114,128,.14);color:var(--muted)}
 
     .table{width:100%;border-collapse:collapse}
     .table th,.table td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
@@ -66,15 +67,26 @@
     <header>
       <div>
         <h1>Weighted Weekly Chore Picker</h1>
-        <div class="sub">Cadence-aware • Remembers last done • Outstanding tasks • Two-person fairness</div>
+        <div class="sub">Cadence-aware • Rolling cycles • Sticky owner per cycle • Two-person fairness</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <div class="pill" id="monthPill">Month: —</div>
+        <div class="pill" id="cyclePill">Cycle: —</div>
       </div>
     </header>
 
     <section class="card">
       <div class="controls">
+        <div>
+          <label for="cycleMode">Cycle mode</label>
+          <select id="cycleMode">
+            <option value="rolling">Rolling weeks</option>
+            <option value="monthly">Monthly (1st Sunday)</option>
+          </select>
+        </div>
+        <div id="weeksWrap">
+          <label for="weeksPerCycle">Weeks per cycle</label>
+          <input id="weeksPerCycle" type="number" step="1" min="1" max="12" value="4" />
+        </div>
         <div>
           <label for="cap">Weekly weight cap</label>
           <input id="cap" type="number" step="0.5" min="0.5" value="8" />
@@ -86,12 +98,12 @@
         <button class="btn accent" id="drawBtn">Draw this week</button>
         <button class="btn success" id="finishBtn" title="Assign all currently-due tasks (ignores cap)">Finish due</button>
         <button class="btn secondary" id="undoBtn" title="Undo last assignment batch">Undo last</button>
-        <button class="btn secondary" id="resetBtn" title="Clears this month's history only (does not forget last done)">Clear month history</button>
+        <button class="btn secondary" id="resetBtn" title="Clears this cycle's assignment history only (does not forget last done)">Clear cycle history</button>
       </div>
 
       <div class="section-title" style="margin-top:14px">
-        <strong>This month</strong>
-        <span class="muted" id="monthStats">—</span>
+        <strong>This cycle</strong>
+        <span class="muted" id="cycleStats">—</span>
       </div>
       <div class="progress"><span id="progressBar"></span></div>
 
@@ -141,9 +153,10 @@
           <thead>
             <tr>
               <th>Name</th>
+              <th style="width:140px">This cycle</th>
               <th style="width:110px">Weight</th>
               <th style="width:140px">Cadence (days)</th>
-              <th style="width:120px">Enabled</th>
+              <th style="width:100px">Enabled</th>
               <th>Tags</th>
               <th style="width:180px">Last done</th>
               <th style="width:180px">Next due</th>
@@ -181,41 +194,89 @@
   const LS_OLD_STATE='choresDeck_v1_state';
   const WEEK_TOL=0.5; // weekly fairness tolerance (±0.5)
   const DEFAULT_CADENCE_DAYS=30;
+  const DEFAULT_CYCLE_MODE='rolling'; // 'rolling' | 'monthly'
+  const DEFAULT_WEEKS_PER_CYCLE=4;
 
   const MS_DAY = 86400000;
+  const MS_WEEK = 7 * MS_DAY;
 
+  // Fixed Sunday anchor for rolling cycle alignment (Jan 7, 2024 is a Sunday).
+  // All rolling cycles are deterministic multiples of N weeks from this anchor.
+  const ROLLING_EPOCH = new Date(2024, 0, 7, 0, 0, 0, 0).getTime();
+
+  // --------- Cycle math ---------
   function firstSundayTs(year, monthIndex){
     const d = new Date(year, monthIndex, 1, 0, 0, 0, 0);
     const offset = (7 - d.getDay()) % 7; // 0..6 (Sun = 0)
     return new Date(year, monthIndex, 1 + offset, 0, 0, 0, 0).getTime();
   }
 
-  // Cycle start = first Sunday of the current month if we've reached it,
-  // otherwise first Sunday of the previous month.
-  function currentCycleStartTs(nowTs = Date.now()){
+  // Sunday at midnight for the week containing nowTs (the Sunday on or before now).
+  function sundayOfWeekTs(nowTs){
+    const d = new Date(nowTs);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay());
+    return d.getTime();
+  }
+
+  // Rolling cycle start: align to N-week buckets anchored at ROLLING_EPOCH.
+  function rollingCycleStartTs(nowTs, weeksPerCycle){
+    const n = Math.max(1, Math.floor(weeksPerCycle||DEFAULT_WEEKS_PER_CYCLE));
+    const currentSunday = sundayOfWeekTs(nowTs);
+    const weeksSinceEpoch = Math.floor((currentSunday - ROLLING_EPOCH) / MS_WEEK);
+    const cycleIdx = Math.floor(weeksSinceEpoch / n);
+    return ROLLING_EPOCH + cycleIdx * n * MS_WEEK;
+  }
+
+  // Monthly-mode cycle start = first Sunday of current month if we've reached it,
+  // otherwise first Sunday of previous month.
+  function monthlyCycleStartTs(nowTs){
     const now = new Date(nowTs);
     const y = now.getFullYear();
     const m = now.getMonth();
     const thisMonth = firstSundayTs(y, m);
     if (nowTs >= thisMonth) return thisMonth;
-
     const prev = new Date(y, m, 0); // last day of prev month
     return firstSundayTs(prev.getFullYear(), prev.getMonth());
   }
 
+  function currentCycleStartTs(nowTs = Date.now()){
+    if (getCycleMode() === 'rolling'){
+      return rollingCycleStartTs(nowTs, getWeeksPerCycle());
+    }
+    return monthlyCycleStartTs(nowTs);
+  }
+
   function nextCycleStartTs(cycleStartTs){
+    if (getCycleMode() === 'rolling'){
+      return cycleStartTs + getWeeksPerCycle() * MS_WEEK;
+    }
     const d = new Date(cycleStartTs);
     const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 1);
     return firstSundayTs(nextMonth.getFullYear(), nextMonth.getMonth());
   }
 
-  // Monthly-ish chores reset on the cycle boundary.
-  function isMonthlyLike(c){
-    return clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS) >= 28;
+  // Approximate cycle length in days for cadence comparisons.
+  function cycleLengthDays(){
+    if (getCycleMode() === 'rolling') return getWeeksPerCycle() * 7;
+    return 30; // monthly approximation
   }
 
-  // When a new cycle begins, clear outstanding assignments from the previous cycle
-  // so they don’t block tasks from becoming due again.
+  // "Cycle-reset" chores (formerly "monthly-like") reset on the cycle boundary.
+  // In rolling mode, a cadence close to or >= the cycle length counts.
+  // In monthly mode, keep the historical >= 28 threshold.
+  function isCycleReset(c){
+    const cadenceDays = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
+    if (getCycleMode() === 'rolling'){
+      return cadenceDays >= Math.max(1, cycleLengthDays() - 2);
+    }
+    return cadenceDays >= 28;
+  }
+  // Keep old name as an alias for any lingering references.
+  const isMonthlyLike = isCycleReset;
+
+  // When a new cycle begins (or mode changes so cycleStart differs), clear outstanding
+  // assignments that predate the new cycle, and prune stale per-cycle assignments.
   function maybeRolloverCycle(nowTs = Date.now()){
     const cycleStart = currentCycleStartTs(nowTs);
 
@@ -224,9 +285,15 @@
       return false;
     }
 
-    if (cycleStart > state.cycleStartTs + 1000){
+    if (cycleStart !== state.cycleStartTs){
       for (const [id, o] of Object.entries(state.open || {})){
         if ((o && o.assignedTs ? o.assignedTs : 0) < cycleStart) delete state.open[id];
+      }
+      // Prune cycleAssignments: keep only the entry for the active cycle.
+      if (state.cycleAssignments){
+        for (const k of Object.keys(state.cycleAssignments)){
+          if (String(k) !== String(cycleStart)) delete state.cycleAssignments[k];
+        }
       }
       state.cycleStartTs = cycleStart;
       return true;
@@ -234,9 +301,7 @@
     return false;
   }
 
-  // Final list only (as requested earlier) - now with default cadenceDays
-  // Defaults keep your original "monthly pool" feel by using cadenceDays=30 for everything.
-  // You can set biweekly to 14, weekly to 7, etc. in the Manage table.
+  // --------- Defaults ---------
   const defaultChores=[
     {id:'cleaning_shared_bathroom',name:'Cleaning Shared Bathroom',weight:3,cadenceDays:30,tags:['Bathroom'],enabled:true},
     {id:'cleaning_bedroom_bathroom',name:'Cleaning Bedroom Bathroom',weight:3,cadenceDays:30,tags:['Bathroom'],enabled:true},
@@ -265,9 +330,14 @@
 
   // State shape (persisted):
   // state = {
+  //   cycleMode: 'rolling' | 'monthly',
+  //   weeksPerCycle: number (rolling mode only),
+  //   cycleStartTs: number (ms; current cycle start, set by maybeRolloverCycle),
+  //   cycleAssignments: { [cycleStartTs]: { [taskId]: ownerName } }, // sticky per-cycle owner
   //   months: { [YYYY-MM]: { history: [{ts,total,items:[{id,name,weight,owner}]}] } },
   //   open: { [taskId]: {assignedTs, owner} },
   //   meta: { [taskId]: { lastDoneTs, snoozeUntilTs } },
+  //   doneLog: [{ts,id,name,weight,owner}],
   //   cap, people
   // }
 
@@ -279,14 +349,24 @@
   let state=load(LS_STATE);
   if(!state) state = load(LS_OLD_STATE);
   if(!state) state = {};
+  // Set defaults for new fields (migration-safe for existing users)
+  if(state.cycleMode !== 'monthly' && state.cycleMode !== 'rolling') state.cycleMode = DEFAULT_CYCLE_MODE;
+  if(typeof state.weeksPerCycle !== 'number' || !isFinite(state.weeksPerCycle) || state.weeksPerCycle < 1){
+    state.weeksPerCycle = DEFAULT_WEEKS_PER_CYCLE;
+  }
+  if(!state.cycleAssignments || typeof state.cycleAssignments !== 'object') state.cycleAssignments = {};
+
   normalizeData();
 
   // elements
   const $=q=>document.querySelector(q);
   const capInput=$('#cap');
   const peopleInput=$('#people');
-  const monthPill=$('#monthPill');
-  const monthStats=$('#monthStats');
+  const cycleModeSel=$('#cycleMode');
+  const weeksInput=$('#weeksPerCycle');
+  const weeksWrap=$('#weeksWrap');
+  const cyclePill=$('#cyclePill');
+  const cycleStats=$('#cycleStats');
   const progressBar=$('#progressBar');
   const outstandingEl=$('#outstanding');
   const outstandingMeta=$('#outstandingMeta');
@@ -300,17 +380,23 @@
 
   // wire
   $('#drawBtn').addEventListener('click', onDrawWeek);
-  $('#finishBtn').addEventListener('click', ()=>assignBatch(getDueTasks(), true));
+  $('#finishBtn').addEventListener('click', ()=>assignBatch(fairAssign(getDueTasks(), readPeople()), true));
   $('#undoBtn').addEventListener('click', undoLastBatch);
-  $('#resetBtn').addEventListener('click', clearMonthHistory);
+  $('#resetBtn').addEventListener('click', clearCycleHistory);
   $('#exportBtn').addEventListener('click', exportJSON);
   $('#importBtn').addEventListener('click', ()=>$('#importInput').click());
   $('#importInput').addEventListener('change', importJSON);
   $('#addBtn').addEventListener('click', addChore);
 
+  cycleModeSel.value = state.cycleMode;
+  weeksInput.value = state.weeksPerCycle;
+  cycleModeSel.addEventListener('change', onCycleModeChange);
+  weeksInput.addEventListener('change', onWeeksChange);
+
   capInput.value = (state.cap==null?8:state.cap);
   peopleInput.value = (state.people && state.people.length)? state.people.join(', ') : 'Adam, Hannah';
 
+  updateWeeksVisibility();
   renderAll();
 
   // --------------------
@@ -319,15 +405,52 @@
   // - enabled
   // - not currently outstanding (open)
   // - not snoozed
-  // - lastDone is missing OR (now - lastDone) >= cadenceDays
-  // This means tasks can recur within a month if cadenceDays is short.
+  // - lastDone is missing OR (cycle-reset && lastDone < cycleStart) OR ((now - lastDone) >= cadenceDays)
+  // Cycle-reset chores reset on the cycle boundary (rolling N-weeks or monthly).
   // --------------------
+
+  function onCycleModeChange(){
+    state.cycleMode = (cycleModeSel.value === 'monthly') ? 'monthly' : 'rolling';
+    updateWeeksVisibility();
+    applyCycleConfigChange();
+  }
+
+  function onWeeksChange(){
+    const v = clampNum(weeksInput.value, 1, 12, DEFAULT_WEEKS_PER_CYCLE);
+    weeksInput.value = v;
+    state.weeksPerCycle = v;
+    applyCycleConfigChange();
+  }
+
+  function updateWeeksVisibility(){
+    weeksWrap.style.display = (state.cycleMode === 'rolling') ? '' : 'none';
+  }
+
+  function applyCycleConfigChange(){
+    // Force a rollover check with the new config. If cycle start moved,
+    // outstanding from the old cycle and stale cycleAssignments are pruned.
+    const newCs = currentCycleStartTs();
+    if (state.cycleStartTs !== newCs){
+      for (const [id, o] of Object.entries(state.open || {})){
+        if ((o && o.assignedTs ? o.assignedTs : 0) < newCs) delete state.open[id];
+      }
+      if (state.cycleAssignments){
+        for (const k of Object.keys(state.cycleAssignments)){
+          if (String(k) !== String(newCs)) delete state.cycleAssignments[k];
+        }
+      }
+      state.cycleStartTs = newCs;
+    }
+    save(LS_STATE, state);
+    renderAll();
+  }
 
   function normalizeData(){
     if(!state.months) state.months = {};
     if(!state.open) state.open = {};
     if(!state.meta) state.meta = {};
     if(!state.doneLog) state.doneLog = [];
+    if(!state.cycleAssignments) state.cycleAssignments = {};
     const m=monthKey();
     if(!state.months[m]) state.months[m] = { history: [] };
 
@@ -344,9 +467,8 @@
       return { id, name, weight, cadenceDays, tags, enabled };
     });
 
-    // Drop open/meta for missing ids
+    // Drop open/meta/assignments for missing ids
     const ids = new Set(chores.map(c=>c.id));
-    // Prune completion log: keep only known task ids, and keep it bounded in size
     if(!Array.isArray(state.doneLog)) state.doneLog = [];
     const cutoff = Date.now() - 366*86400000;
     state.doneLog = state.doneLog
@@ -355,9 +477,34 @@
 
     for(const k of Object.keys(state.open)) if(!ids.has(k)) delete state.open[k];
     for(const k of Object.keys(state.meta)) if(!ids.has(k)) delete state.meta[k];
+    for(const csKey of Object.keys(state.cycleAssignments)){
+      const bucket = state.cycleAssignments[csKey] || {};
+      for(const tid of Object.keys(bucket)) if(!ids.has(tid)) delete bucket[tid];
+    }
 
     save(LS_DATA, chores);
     save(LS_STATE, state);
+  }
+
+  // --------- Owner stickiness helpers ---------
+  function getCurrentCycleBucket(){
+    const cs = currentCycleStartTs();
+    if(!state.cycleAssignments) state.cycleAssignments = {};
+    if(!state.cycleAssignments[cs]) state.cycleAssignments[cs] = {};
+    return state.cycleAssignments[cs];
+  }
+
+  function getOwnerForTask(taskId){
+    // Prefer live outstanding owner; otherwise fall back to this cycle's sticky assignment.
+    if(state.open[taskId] && state.open[taskId].owner) return state.open[taskId].owner;
+    const bucket = (state.cycleAssignments && state.cycleAssignments[currentCycleStartTs()]) || {};
+    return bucket[taskId] || '';
+  }
+
+  function recordCycleOwner(taskId, owner){
+    if(!owner) return;
+    const bucket = getCurrentCycleBucket();
+    bucket[taskId] = owner;
   }
 
   // --------- Draw / Assign ---------
@@ -381,9 +528,10 @@
     const total=items.reduce((s,t)=>s+(t.weight||0),0);
     state.months[m].history.push({ ts: now, items: items.map(x=>({id:x.id,name:x.name,weight:x.weight,owner:x.owner})), total, finish: !!isFinish });
 
-    // mark as outstanding
+    // mark as outstanding + record sticky owner for this cycle
     for(const it of items){
       state.open[it.id] = { assignedTs: now, owner: it.owner || '' };
+      if(it.owner) recordCycleOwner(it.id, it.owner);
     }
 
     state.cap=getCap();
@@ -393,24 +541,58 @@
   }
 
   function undoLastBatch(){
-    const m=monthKey();
-    const hist=(state.months[m] && state.months[m].history) ? state.months[m].history : [];
-    if(!hist.length){ alert('Nothing to undo.'); return; }
-    const last = hist.pop();
-    // remove open flags only for items from that batch IF they were not completed in the meantime
-    for(const it of (last.items||[])){
-      if(state.open[it.id] && state.open[it.id].assignedTs === last.ts){
+    // Find the most recent batch across any month bucket
+    let latest = null, latestMonth = null, latestIdx = -1;
+    for(const [m, mm] of Object.entries(state.months||{})){
+      const hist = (mm && mm.history) || [];
+      for(let i=hist.length-1;i>=0;i--){
+        if(!latest || hist[i].ts > latest.ts){
+          latest = hist[i]; latestMonth = m; latestIdx = i;
+        }
+      }
+    }
+    if(!latest){ alert('Nothing to undo.'); return; }
+
+    state.months[latestMonth].history.splice(latestIdx, 1);
+
+    // Remove open flags only for items from that batch IF they were not completed in the meantime
+    const bucket = getCurrentCycleBucket();
+    for(const it of (latest.items||[])){
+      if(state.open[it.id] && state.open[it.id].assignedTs === latest.ts){
         delete state.open[it.id];
+      }
+      // If no other batch in the current cycle assigned this task, clear the sticky owner too.
+      if(bucket[it.id]){
+        const stillAssignedInCycle = anyBatchAssignsTaskInCycle(it.id);
+        if(!stillAssignedInCycle) delete bucket[it.id];
       }
     }
     save(LS_STATE,state);
     renderAll();
   }
 
-  function clearMonthHistory(){
-    if(!confirm("Clear this month's assignment history? (Last done dates and outstanding tasks remain.)")) return;
-    const m=monthKey();
-    state.months[m] = { history: [] };
+  function anyBatchAssignsTaskInCycle(taskId){
+    const cs = currentCycleStartTs();
+    for(const mm of Object.values(state.months||{})){
+      const hist = (mm && mm.history) || [];
+      for(const h of hist){
+        if(h.ts < cs) continue;
+        if((h.items||[]).some(it => it.id === taskId && it.owner)) return true;
+      }
+    }
+    return false;
+  }
+
+  function clearCycleHistory(){
+    if(!confirm("Clear this cycle's assignment history? (Last done dates and outstanding tasks remain.)")) return;
+    const cs = currentCycleStartTs();
+    for(const m of Object.keys(state.months||{})){
+      if(state.months[m] && Array.isArray(state.months[m].history)){
+        state.months[m].history = state.months[m].history.filter(h => (h.ts||0) < cs);
+      }
+    }
+    // Also reset sticky owners for the current cycle
+    if(state.cycleAssignments) state.cycleAssignments[cs] = {};
     save(LS_STATE,state);
     renderAll();
   }
@@ -421,15 +603,16 @@
     const t=getTaskById(taskId);
     if(!t) return;
 
-    // record completion event (for Completed list)
     if(!Array.isArray(state.doneLog)) state.doneLog = [];
-    const owner = (state.open[taskId] && state.open[taskId].owner) ? state.open[taskId].owner : '';
+    // owner comes from outstanding, else from sticky cycle assignment
+    const owner = (state.open[taskId] && state.open[taskId].owner)
+      ? state.open[taskId].owner
+      : getOwnerForTask(taskId);
     state.doneLog.push({ ts: now, id: taskId, name: t.name, weight: t.weight, owner });
     if(state.doneLog.length>500) state.doneLog = state.doneLog.slice(-500);
 
     if(!state.meta[taskId]) state.meta[taskId] = {};
     state.meta[taskId].lastDoneTs = now;
-    // clear snooze and outstanding
     delete state.meta[taskId].snoozeUntilTs;
     delete state.open[taskId];
     save(LS_STATE,state);
@@ -440,7 +623,6 @@
     if(!state.meta[taskId]) state.meta[taskId] = {};
     delete state.meta[taskId].lastDoneTs;
     delete state.meta[taskId].snoozeUntilTs;
-    // Do not touch doneLog; it's a history record
     save(LS_STATE,state);
     renderAll();
   }
@@ -450,7 +632,6 @@
     const d = clampNum(days, 1, 365, 7);
     if(!state.meta[taskId]) state.meta[taskId] = {};
     state.meta[taskId].snoozeUntilTs = now + d*86400000;
-    // remove from outstanding
     delete state.open[taskId];
     save(LS_STATE,state);
     renderAll();
@@ -472,7 +653,7 @@
     const lastDone = meta.lastDoneTs || 0;
     if(!lastDone) return true;
 
-    if(isMonthlyLike(c)){
+    if(isCycleReset(c)){
       const cycleStart = currentCycleStartTs(now);
       return lastDone < cycleStart;
     }
@@ -490,7 +671,7 @@
     let due;
     if(!lastDone){
       due = now;
-    } else if(isMonthlyLike(c)){
+    } else if(isCycleReset(c)){
       const cycleStart = currentCycleStartTs(now);
       due = (lastDone < cycleStart) ? now : nextCycleStartTs(cycleStart);
     } else {
@@ -504,7 +685,6 @@
   // --------- Selection & Fairness ---------
   function pickWeeklySet(pool, cap, people){
     if(people.length===2){
-      // pick a subset that (a) can be split within ±0.5 when feasible, then (b) uses cap well.
       return optimizeWeeklySubset2(pool, cap, people);
     }
     return drawToCapRandom(pool, cap);
@@ -538,17 +718,15 @@
     return list[list.length-1];
   }
 
-  // Optimizer: for 2 people, pick subset under capU (half-units) that prefers weekly diff <= 0.5
   function optimizeWeeklySubset2(pool, cap, people){
     const capU=Math.max(1,Math.floor(cap*2));
-    const T=Math.round(WEEK_TOL*2); // 0.5 -> 1 unit
+    const T=Math.round(WEEK_TOL*2);
 
-    // Convert weights to half-units and filter items too large
     const items=pool
       .map(it=>({it,wU:Math.max(1,Math.round((it.weight||0)*2))}))
       .filter(x=>x.wU<=capU);
 
-    let best=null; // {hasTol,capGap,weekDiffU,sumU,mask}
+    let best=null;
 
     function better(a,b){
       if(!a) return true;
@@ -561,7 +739,6 @@
 
     function evalSubset(sumU, dp, mask){
       if(sumU===0) return;
-      // can we split this subset within tolerance?
       let bestDiffU=Infinity;
       for(let sU=0;sU<=sumU;sU++){
         if(((dp>>sU)&1)!==1) continue;
@@ -587,8 +764,6 @@
       dfs(i+1, sumU, dp, mask);
     }
 
-    // Limit search size to avoid worst-case explosions.
-    // If we have too many items, fallback to greedy fill then fairness assignment.
     if(items.length>24){
       return drawToCapRandom(pool, cap);
     }
@@ -601,7 +776,6 @@
     return out.length? out : drawToCapRandom(pool, cap);
   }
 
-  // Assign owners to picked items, trying to keep this week's diff <= 0.5 when feasible.
   function fairAssign(items, people){
     if(!people.length) return items.map(i=>({...i,owner:undefined}));
     if(people.length===1) return items.map(i=>({...i,owner:people[0]}));
@@ -631,7 +805,6 @@
       }
     }
 
-    // fallback greedy
     const weekTotals=new Map(people.map(p=>[p,0]));
     return [...items].sort((a,b)=>(b.weight||0)-(a.weight||0)).map(it=>{
       let pick=people[0], min=Infinity;
@@ -648,27 +821,28 @@
   function renderAll(){
     normalizeData();
 
-    const m=monthKey();
-    monthPill.textContent='Month: '+m;
-
     const now=Date.now();
     const cycleStart = currentCycleStartTs(now);
+    const cycleEnd = nextCycleStartTs(cycleStart);
+
+    // Cycle pill
+    cyclePill.textContent = formatCycleLabel(cycleStart, cycleEnd);
 
     const due=getDueTasks();
     const openIds=Object.keys(state.open||{});
     const openTasks=openIds.map(id=> getTaskById(id)).filter(Boolean);
 
-    // Month stats
-    const hist=(state.months[m] && state.months[m].history) ? state.months[m].history : [];
-    const assignedWeight=hist.reduce((s,h)=>s+(h.total||0),0);
+    // Assignment history across months, filtered to this cycle
+    const allBatches = Object.values(state.months || {})
+      .flatMap(mm => (mm && mm.history) ? mm.history : []);
+    const batchesThisCycle = allBatches.filter(h => (h.ts||0) >= cycleStart && (h.ts||0) < cycleEnd);
+    const assignedWeight = batchesThisCycle.reduce((s,h)=>s+(h.total||0),0);
 
-    // done weight this cycle: sum of weights for tasks whose lastDoneTs is within this cycle
-    const doneIds=[];
+    // Done weight this cycle: sum of weights for tasks whose lastDoneTs is within this cycle
     let doneWeight=0;
     for(const c of chores){
       const ld=(state.meta[c.id] && state.meta[c.id].lastDoneTs) ? state.meta[c.id].lastDoneTs : 0;
       if(ld && ld>=cycleStart && ld<=now){
-        doneIds.push(c.id);
         doneWeight += (c.weight||0);
       }
     }
@@ -677,7 +851,7 @@
     const progress = (doneWeight + backlogWeight) > 0 ? (doneWeight/(doneWeight+backlogWeight)) : 0;
     progressBar.style.width = Math.round(progress*100)+'%';
 
-    monthStats.textContent = 'Done '+doneWeight.toFixed(1)+' wt • Outstanding '+openTasks.length+' • Due '+due.length+' • Assigned '+assignedWeight.toFixed(1)+' wt';
+    cycleStats.textContent = 'Done '+doneWeight.toFixed(1)+' wt • Outstanding '+openTasks.length+' • Due '+due.length+' • Assigned '+assignedWeight.toFixed(1)+' wt';
 
     // Outstanding
     outstandingEl.innerHTML='';
@@ -689,14 +863,13 @@
     // Completed (this cycle)
     completedEl.innerHTML='';
     const doneLog = Array.isArray(state.doneLog) ? state.doneLog : [];
-    const doneThisMonth = doneLog
+    const doneThisCycle = doneLog
       .filter(ev=>ev && typeof ev.ts==='number' && ev.ts>=cycleStart && ev.ts<=now)
       .sort((a,b)=>b.ts-a.ts);
 
-    // Prefer log, but if empty (e.g., older usage), fall back to meta.lastDoneTs this cycle
     let latestById = new Map();
-    if(doneThisMonth.length){
-      for(const ev of doneThisMonth){
+    if(doneThisCycle.length){
+      for(const ev of doneThisCycle){
         if(!latestById.has(ev.id)) latestById.set(ev.id, ev);
       }
     } else {
@@ -704,7 +877,7 @@
       for(const c of chores){
         const ld=(state.meta[c.id] && state.meta[c.id].lastDoneTs) ? state.meta[c.id].lastDoneTs : 0;
         if(ld && ld>=cycleStart && ld<=now){
-          fall.push({ ts: ld, id: c.id, name: c.name, weight: c.weight, owner: '' });
+          fall.push({ ts: ld, id: c.id, name: c.name, weight: c.weight, owner: getOwnerForTask(c.id) });
         }
       }
       fall.sort((a,b)=>b.ts-a.ts);
@@ -714,19 +887,21 @@
     }
 
     const completedList = Array.from(latestById.values()).sort((a,b)=>b.ts-a.ts);
-    completedMeta.textContent = completedList.length ? (completedList.length+' completed this month') : 'None yet';
+    completedMeta.textContent = completedList.length ? (completedList.length+' completed this cycle') : 'None yet';
     completedList.slice(0,12).forEach(ev=>{
       const t=getTaskById(ev.id);
-      if(t) completedEl.appendChild(taskCard({...t, owner: ev.owner, _completedTs: ev.ts}, {mode:'completed'}));
+      if(t) completedEl.appendChild(taskCard({...t, owner: ev.owner || getOwnerForTask(t.id), _completedTs: ev.ts}, {mode:'completed'}));
     });
 
-    // Last batch
+    // Last batch (across all months)
     lastDrawEl.innerHTML='';
-    const last = hist[hist.length-1] || null;
-    lastDrawMeta.textContent = last ? (last.items.length+' tasks • '+new Date(last.ts).toLocaleString([], {month:'short', day:'numeric'}) ) : '—';
+    const last = allBatches.sort((a,b)=>(b.ts||0)-(a.ts||0))[0] || null;
+    lastDrawMeta.textContent = last
+      ? (last.items.length+' tasks • '+new Date(last.ts).toLocaleString([], {month:'short', day:'numeric'}))
+      : '—';
     (last ? last.items : []).forEach(it=>{
       const t=getTaskById(it.id);
-      if(t) lastDrawEl.appendChild(taskCard({...t, owner: it.owner}, {mode:'last'}));
+      if(t) lastDrawEl.appendChild(taskCard({...t, owner: it.owner || getOwnerForTask(t.id)}, {mode:'last'}));
     });
 
     // Due list
@@ -739,6 +914,16 @@
     renderTable();
   }
 
+  function formatCycleLabel(cycleStart, cycleEnd){
+    const fmt = d => d.toLocaleDateString([], {month:'short', day:'numeric'});
+    const s = new Date(cycleStart);
+    const e = new Date(cycleEnd - MS_DAY);
+    if(getCycleMode() === 'rolling'){
+      return 'Cycle: '+fmt(s)+' – '+fmt(e)+' ('+getWeeksPerCycle()+'w)';
+    }
+    return 'Cycle: '+fmt(s)+' – '+fmt(e);
+  }
+
   function taskCard(t, opts){
     const mode = (opts && opts.mode) ? opts.mode : 'due';
     const meta = state.meta[t.id] || {};
@@ -746,6 +931,9 @@
     const snoozeUntil = meta.snoozeUntilTs || 0;
     const dueTs = nextDueTs(t);
     const now = Date.now();
+
+    // Resolve owner: prefer explicit on passed object, then live outstanding, then sticky cycle assignment
+    const owner = (t.owner && String(t.owner)) ? t.owner : getOwnerForTask(t.id);
 
     const badge = (function(){
       if(snoozeUntil && now < snoozeUntil) return '<span class="badge snoozed">Snoozed</span>';
@@ -760,10 +948,11 @@
 
     const line1 = '<h3 class="task-title">'+escapeHtml(t.name)+'</h3>';
 
+    const ownerClass = (mode==='completed' || mode==='outstanding') ? 'owner-badge' : 'owner-badge muted-owner';
     const line2 = '<div class="muted">'
       +'Weight <b>'+(t.weight||0).toFixed(1)+'</b>'
       +' • Cadence <b>'+clampNum(t.cadenceDays,1,365,DEFAULT_CADENCE_DAYS)+'</b>d'
-      +(t.owner ? ' • <span class="owner-badge">'+escapeHtml(t.owner)+'</span>' : '')
+      +(owner ? ' • <span class="'+ownerClass+'">'+escapeHtml(owner)+'</span>' : '')
       +' • '+badge
       +'</div>';
 
@@ -779,7 +968,6 @@
     const actions=document.createElement('div');
     actions.className='actions';
 
-    // actions differ by mode
     const doneBtn = mkBtn('Mark done', 'btn sm success', ()=>markDone(t.id));
     const snooze7 = mkBtn('Snooze 7d', 'btn sm secondary', ()=>snooze(t.id, 7));
     const snooze14 = mkBtn('Snooze 14d', 'btn sm secondary', ()=>snooze(t.id, 14));
@@ -808,9 +996,15 @@
       const meta=state.meta[c.id] || {};
       const ld=meta.lastDoneTs || 0;
       const nd=nextDueTs(c);
+      const owner = getOwnerForTask(c.id);
+
+      const ownerCell = owner
+        ? '<span class="owner-badge">'+escapeHtml(owner)+'</span>'
+        : '<span class="muted">—</span>';
 
       tr.innerHTML =
         '<td><input type="text" value="'+escapeHtml(c.name)+'" data-k="name" data-i="'+i+'" /></td>'+
+        '<td>'+ownerCell+'</td>'+
         '<td><input type="number" step="0.5" value="'+c.weight+'" data-k="weight" data-i="'+i+'" /></td>'+
         '<td><input type="number" step="1" value="'+clampNum(c.cadenceDays,1,365,DEFAULT_CADENCE_DAYS)+'" data-k="cadenceDays" data-i="'+i+'" /></td>'+
         '<td><input type="checkbox" '+(c.enabled!==false?'checked':'')+' data-k="enabled" data-i="'+i+'" /></td>'+
@@ -826,7 +1020,6 @@
       tableBody.appendChild(tr);
     });
 
-    // inputs
     tableBody.querySelectorAll('input[type=text],input[type=number]').forEach(inp=>{
       inp.addEventListener('change', e=>{
         const i=+e.target.dataset.i;
@@ -841,7 +1034,6 @@
       });
     });
 
-    // enabled checkbox
     tableBody.querySelectorAll('input[type=checkbox][data-k=enabled]').forEach(chk=>{
       chk.addEventListener('change', e=>{
         const i=+e.target.dataset.i;
@@ -851,7 +1043,6 @@
       });
     });
 
-    // done/snooze/delete buttons
     tableBody.querySelectorAll('button[data-done]').forEach(btn=>{
       btn.addEventListener('click', e=> markDone(e.target.dataset.done));
     });
@@ -866,6 +1057,12 @@
         chores.splice(idx,1);
         delete state.open[id];
         delete state.meta[id];
+        // Also strip from cycle assignments buckets
+        if(state.cycleAssignments){
+          for(const k of Object.keys(state.cycleAssignments)){
+            if(state.cycleAssignments[k]) delete state.cycleAssignments[k][id];
+          }
+        }
         save(LS_DATA, chores);
         save(LS_STATE, state);
         renderAll();
@@ -899,13 +1096,13 @@
 
   function exportJSON(){
     try{
-      const payload={version:2, chores, state};
+      const payload={version:3, chores, state};
       const data=JSON.stringify(payload,null,2);
       const blob=new Blob([data],{type:'application/json'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url;
-      a.download='chores-'+monthKey()+'-v2.json';
+      a.download='chores-'+monthKey()+'-v3.json';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -942,12 +1139,20 @@
       chores=cleaned;
       save(LS_DATA, chores);
 
-      // If file includes state, merge meta/open if compatible
       if(json && json.state && typeof json.state==='object'){
         state.meta = json.state.meta || state.meta || {};
         state.open = json.state.open || state.open || {};
-        // keep months but ensure current exists
         state.months = json.state.months || state.months || {};
+        state.cycleAssignments = json.state.cycleAssignments || state.cycleAssignments || {};
+        if(json.state.cycleMode === 'monthly' || json.state.cycleMode === 'rolling'){
+          state.cycleMode = json.state.cycleMode;
+          cycleModeSel.value = state.cycleMode;
+        }
+        if(typeof json.state.weeksPerCycle === 'number' && json.state.weeksPerCycle >= 1){
+          state.weeksPerCycle = json.state.weeksPerCycle;
+          weeksInput.value = state.weeksPerCycle;
+        }
+        updateWeeksVisibility();
         const m=monthKey();
         if(!state.months[m]) state.months[m] = { history: [] };
         save(LS_STATE, state);
@@ -1096,6 +1301,16 @@
     return Math.max(0.5, isNaN(v)?8:v);
   }
 
+  function getCycleMode(){
+    return (state.cycleMode === 'monthly') ? 'monthly' : 'rolling';
+  }
+
+  function getWeeksPerCycle(){
+    const v = state.weeksPerCycle;
+    if(typeof v === 'number' && isFinite(v) && v >= 1) return Math.floor(v);
+    return DEFAULT_WEEKS_PER_CYCLE;
+  }
+
   function readPeople(){
     return peopleInput.value.split(',').map(s=>s.trim()).filter(Boolean);
   }
@@ -1147,6 +1362,7 @@
 
     // T2: open items excluded from due
     (function(){
+      if(!chores.length) return;
       const id=chores[0].id;
       state.open[id]={assignedTs:Date.now(),owner:'A'};
       const dueIds=new Set(getDueTasks().map(x=>x.id));
@@ -1159,7 +1375,7 @@
 
     // T4: completion log records and markNotDone clears lastDone
     (function(){
-      const tmpId='__t_done';
+      const tmpId='ztest-done'; // slug-safe so normalizeData() doesn't rename it
       chores.push({id:tmpId,name:'Tmp Done',weight:1,cadenceDays:7,tags:[],enabled:true});
       if(!state.meta[tmpId]) state.meta[tmpId]={};
       delete state.meta[tmpId].lastDoneTs;
@@ -1170,13 +1386,12 @@
       markNotDone(tmpId);
       const cleared = !(state.meta[tmpId] && state.meta[tmpId].lastDoneTs);
       assert('T4 markNotDone clears lastDone', cleared);
-      // cleanup
       chores = chores.filter(c=>c.id!==tmpId);
       delete state.meta[tmpId]; delete state.open[tmpId];
       state.doneLog = (state.doneLog||[]).filter(ev=>ev && ev.id!==tmpId);
     })();
 
-    // T5: monthly-ish chores reset on first Sunday cycle boundary
+    // T5: cycle-reset chores reset on cycle boundary
     (function(){
       const now = Date.now();
       const cycleStart = currentCycleStartTs(now);
@@ -1184,12 +1399,77 @@
 
       if(!state.meta['__t_month']) state.meta['__t_month'] = {};
       state.meta['__t_month'].lastDoneTs = cycleStart - 1;
-      assert('T5 monthly-ish due after cycle start', isDueNow(t, now) === true);
+      assert('T5 cycle-reset due after cycle start', isDueNow(t, now) === true);
 
       state.meta['__t_month'].lastDoneTs = cycleStart + 1;
-      assert('T5 monthly-ish not due if done this cycle', isDueNow(t, now) === false);
+      assert('T5 cycle-reset not due if done this cycle', isDueNow(t, now) === false);
 
       delete state.meta['__t_month'];
+    })();
+
+    // T6: rolling cycle length = weeksPerCycle * 7 days, aligned to Sundays
+    (function(){
+      const savedMode = state.cycleMode;
+      const savedWeeks = state.weeksPerCycle;
+      state.cycleMode = 'rolling';
+      state.weeksPerCycle = 4;
+      const now = Date.now();
+      const cs = currentCycleStartTs(now);
+      const ne = nextCycleStartTs(cs);
+      const lengthDays = Math.round((ne - cs) / MS_DAY);
+      assert('T6 rolling 4w cycle is 28 days', lengthDays === 28);
+      const csDate = new Date(cs);
+      assert('T6 rolling cycle starts on Sunday', csDate.getDay() === 0);
+      assert('T6 rolling cycle covers now', now >= cs && now < ne);
+      // Different N changes length
+      state.weeksPerCycle = 2;
+      const cs2 = currentCycleStartTs(now);
+      const ne2 = nextCycleStartTs(cs2);
+      assert('T6 rolling 2w cycle is 14 days', Math.round((ne2-cs2)/MS_DAY) === 14);
+      state.cycleMode = savedMode;
+      state.weeksPerCycle = savedWeeks;
+    })();
+
+    // T7: owner stickiness — recordCycleOwner makes getOwnerForTask return it
+    (function(){
+      const tmpId='__t_owner';
+      chores.push({id:tmpId,name:'Tmp Owner',weight:1,cadenceDays:7,tags:[],enabled:true});
+      // No outstanding, no sticky: owner empty
+      assert('T7 no owner initially', getOwnerForTask(tmpId) === '');
+      recordCycleOwner(tmpId, 'Adam');
+      assert('T7 sticky owner after recordCycleOwner', getOwnerForTask(tmpId) === 'Adam');
+      // Outstanding owner wins over sticky
+      state.open[tmpId] = { assignedTs: Date.now(), owner: 'Hannah' };
+      assert('T7 outstanding owner wins', getOwnerForTask(tmpId) === 'Hannah');
+      // cleanup
+      delete state.open[tmpId];
+      const bucket = getCurrentCycleBucket();
+      delete bucket[tmpId];
+      chores = chores.filter(c=>c.id!==tmpId);
+    })();
+
+    // T8: assignBatch records sticky owner; still visible after marking the task not-done-yet in the same cycle
+    (function(){
+      const tmpId='ztest-stick'; // slug-safe so normalizeData() doesn't rename it
+      chores.push({id:tmpId,name:'Tmp Stick',weight:1,cadenceDays:7,tags:[],enabled:true});
+      const before = (state.months[monthKey()] && state.months[monthKey()].history) ? state.months[monthKey()].history.length : 0;
+      assignBatch([{id:tmpId,name:'Tmp Stick',weight:1,owner:'Adam'}], false);
+      const after = (state.months[monthKey()] && state.months[monthKey()].history) ? state.months[monthKey()].history.length : 0;
+      assert('T8 assignBatch appends history', after === before+1);
+      assert('T8 sticky owner recorded by assignBatch', getOwnerForTask(tmpId) === 'Adam');
+      // Mark done then the sticky owner is still retrievable via cycleAssignments bucket
+      markDone(tmpId);
+      const bucket = getCurrentCycleBucket();
+      assert('T8 sticky owner survives markDone', bucket[tmpId] === 'Adam');
+      // cleanup
+      chores = chores.filter(c=>c.id!==tmpId);
+      delete state.meta[tmpId]; delete state.open[tmpId]; delete bucket[tmpId];
+      state.doneLog = (state.doneLog||[]).filter(ev=>ev && ev.id!==tmpId);
+      // pop the test batch
+      const mm = state.months[monthKey()];
+      if(mm && mm.history){
+        mm.history = mm.history.filter(h => !(h.items||[]).some(it => it.id === tmpId));
+      }
     })();
 
     save(LS_STATE,state);
