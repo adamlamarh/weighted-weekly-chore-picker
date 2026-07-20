@@ -60,6 +60,40 @@
     .confetti{position:absolute;width:8px;height:12px;border-radius:2px;top:8px;left:50%;transform:translateX(-50%);opacity:.95;animation:conf 1.6s ease-out forwards}
     @keyframes conf{0%{transform:translate(-50%,-10px) rotate(0deg);opacity:1}100%{transform:translate(calc(-50% + var(--dx,0px)),140px) rotate(300deg);opacity:0}}
     .owner-line{display:flex;align-items:center;gap:8px;margin-top:8px}
+
+    /* Tabs */
+    .tabs{display:flex;gap:4px;margin:0 0 16px;border-bottom:1px solid var(--border);overflow-x:auto}
+    .tab-btn{appearance:none;background:transparent;border:none;padding:10px 16px;color:var(--muted);cursor:pointer;font-weight:700;font-size:14px;border-bottom:2px solid transparent;white-space:nowrap}
+    .tab-btn:hover{color:var(--text)}
+    .tab-btn.active{color:var(--text);border-bottom-color:var(--accent)}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+
+    /* History */
+    .history-cycle{border:1px solid var(--border);border-radius:12px;margin:10px 0;background:var(--card)}
+    .history-cycle-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;user-select:none}
+    .history-cycle-header:hover{background:rgba(127,127,127,.06)}
+    .history-cycle-body{border-top:1px solid var(--border);padding:8px 14px 12px}
+    .history-cycle.collapsed .history-cycle-body{display:none}
+    .history-caret{transition:transform .15s ease;color:var(--muted)}
+    .history-cycle.collapsed .history-caret{transform:rotate(-90deg)}
+    .history-batch{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--bg)}
+    .history-batch-meta{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+    .history-item{display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;padding:4px 0;font-size:13px;align-items:center}
+    .history-item + .history-item{border-top:1px dashed var(--border)}
+    .history-item .item-owner{font-weight:800;font-size:12px;padding:2px 8px;border-radius:6px;background:rgba(16,185,129,.14);color:#10b981}
+    .history-item .item-owner.no-owner{background:rgba(107,114,128,.14);color:var(--muted);font-weight:600}
+    .history-item .item-weight{color:var(--muted);font-variant-numeric:tabular-nums}
+    .totals-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+    .totals-card{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--card)}
+    .totals-card h4{margin:0 0 8px;font-size:14px}
+    .totals-row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+    .totals-row .k{color:var(--muted)}
+    .totals-row .v{font-variant-numeric:tabular-nums;font-weight:700}
+
+    /* Modal action rows */
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+    .modal-actions.hidden{display:none}
   </style>
 </head>
 <body>
@@ -67,13 +101,19 @@
     <header>
       <div>
         <h1>Weighted Weekly Chore Picker</h1>
-        <div class="sub">Cadence-aware • Rolling cycles • Sticky owner per cycle • Two-person fairness</div>
+        <div class="sub">Cadence-aware • Rolling cycles • Random draw with rotation • Sticky owner per cycle</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="pill" id="cyclePill">Cycle: —</div>
       </div>
     </header>
 
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="current" role="tab" aria-selected="true">Current</button>
+      <button class="tab-btn" data-tab="history" role="tab" aria-selected="false">History</button>
+    </nav>
+
+    <div id="tab-current" class="tab-panel active" role="tabpanel">
     <section class="card">
       <div class="controls">
         <div>
@@ -167,6 +207,60 @@
         </table>
       </div>
     </div>
+    </div><!-- /#tab-current -->
+
+    <div id="tab-history" class="tab-panel" role="tabpanel">
+      <section class="card">
+        <div class="section-title" style="margin-top:0">
+          <strong>All-time totals</strong>
+          <span class="muted" id="historyTotalsMeta">—</span>
+        </div>
+        <div class="totals-grid" id="historyTotals"></div>
+
+        <div class="section-title" style="margin-top:18px">
+          <strong>All draws</strong>
+          <span class="muted" id="historyMeta">—</span>
+        </div>
+        <div class="row" style="margin-bottom:8px">
+          <div>
+            <label for="historyFilterPerson">Filter by person</label>
+            <select id="historyFilterPerson">
+              <option value="">Anyone</option>
+            </select>
+          </div>
+          <div>
+            <label for="historyFilterChore">Filter by chore</label>
+            <select id="historyFilterChore">
+              <option value="">Any chore</option>
+            </select>
+          </div>
+          <div>
+            <label for="historyGroupBy">Group by</label>
+            <select id="historyGroupBy">
+              <option value="cycle">Cycle (current mode)</option>
+              <option value="month">Calendar month</option>
+              <option value="none">None (chronological)</option>
+            </select>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button class="btn secondary" id="historyExpandAll">Expand all</button>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button class="btn secondary" id="historyCollapseAll">Collapse all</button>
+          </div>
+        </div>
+
+        <div id="historyList"></div>
+
+        <div class="section-title" style="margin-top:18px">
+          <strong>Completion log</strong>
+          <span class="muted" id="historyCompletionsMeta">—</span>
+        </div>
+        <div id="historyCompletions"></div>
+      </section>
+    </div><!-- /#tab-history -->
 
   </div>
 
@@ -178,8 +272,13 @@
         <div id="drawMeta" class="muted">—</div>
       </div>
       <div id="drawList"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <div class="modal-actions" id="drawActionsAnimating">
         <button class="btn secondary" id="skipDraw">Skip animation</button>
+      </div>
+      <div class="modal-actions hidden" id="drawActionsDecide">
+        <button class="btn danger" id="cancelDraw" title="Discard this draw without assigning">Cancel</button>
+        <button class="btn secondary" id="rerollDraw" title="Roll again — nothing is saved until you confirm">Reroll</button>
+        <button class="btn success" id="confirmDraw" title="Assign these chores">Confirm</button>
       </div>
     </div>
   </div>
@@ -377,6 +476,19 @@
   const dueEl=$('#due');
   const dueMeta=$('#dueMeta');
   const tableBody=$('#table tbody');
+  const historyTotalsEl=$('#historyTotals');
+  const historyTotalsMeta=$('#historyTotalsMeta');
+  const historyListEl=$('#historyList');
+  const historyMeta=$('#historyMeta');
+  const historyCompletionsEl=$('#historyCompletions');
+  const historyCompletionsMeta=$('#historyCompletionsMeta');
+  const historyFilterPerson=$('#historyFilterPerson');
+  const historyFilterChore=$('#historyFilterChore');
+  const historyGroupBy=$('#historyGroupBy');
+
+  // Per-group collapsed state (survives re-renders within a session).
+  // Keyed by group id string; true means collapsed.
+  const historyCollapsed = new Map();
 
   // wire
   $('#drawBtn').addEventListener('click', onDrawWeek);
@@ -387,6 +499,37 @@
   $('#importBtn').addEventListener('click', ()=>$('#importInput').click());
   $('#importInput').addEventListener('change', importJSON);
   $('#addBtn').addEventListener('click', addChore);
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const target = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b=>{
+        const active = b.dataset.tab === target;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      document.querySelectorAll('.tab-panel').forEach(p=>{
+        p.classList.toggle('active', p.id === 'tab-' + target);
+      });
+      // Refresh the history view on entry so counts stay accurate
+      if(target === 'history') renderHistory();
+    });
+  });
+
+  // History filter/group wiring
+  historyFilterPerson.addEventListener('change', renderHistory);
+  historyFilterChore.addEventListener('change', renderHistory);
+  historyGroupBy.addEventListener('change', ()=>{ historyCollapsed.clear(); renderHistory(); });
+  $('#historyExpandAll').addEventListener('click', ()=>{ historyCollapsed.clear(); renderHistory(); });
+  $('#historyCollapseAll').addEventListener('click', ()=>{
+    // Mark every currently-shown group as collapsed
+    for(const el of document.querySelectorAll('.history-cycle')){
+      const k = el.dataset.groupKey;
+      if(k) historyCollapsed.set(k, true);
+    }
+    renderHistory();
+  });
 
   cycleModeSel.value = state.cycleMode;
   weeksInput.value = state.weeksPerCycle;
@@ -508,15 +651,27 @@
   }
 
   // --------- Draw / Assign ---------
-  function onDrawWeek(){
+  async function onDrawWeek(){
     const cap=getCap();
     const people=readPeople();
     const pool=getDueTasks();
     if(pool.length===0){ alert('No due tasks right now. (Try lowering cadence days or mark tasks not done.)'); return; }
 
-    const picked = pickWeeklySet(pool, cap, people);
-    const assigned = fairAssign(picked, people);
-    animateDraw(assigned).then(()=> assignBatch(assigned, false));
+    // Loop until the user confirms or cancels; each iteration is a fresh draw.
+    // Nothing is persisted until 'confirm'.
+    let rerollCount = 0;
+    while(true){
+      const picked = pickWeeklySet(pool, cap, people);
+      const assigned = fairAssign(picked, people);
+      const action = await animateDraw(assigned, { rerollCount });
+      if(action === 'confirm'){
+        assignBatch(assigned, false);
+        return;
+      }
+      if(action === 'cancel') return;
+      // action === 'reroll' -> loop
+      rerollCount++;
+    }
   }
 
   function assignBatch(items, isFinish){
@@ -683,11 +838,64 @@
   }
 
   // --------- Selection & Fairness ---------
+  // Picks a subset of the pool that (a) fits under the weekly cap and
+  // (b) — when there are 2 people — can be split fairly between them.
+  //
+  // Randomness: we generate multiple candidate subsets via drawToCapRandom
+  // (which is genuinely random & weight-biased), then pick one at random from
+  // those that split fairly. This replaces the previous deterministic
+  // branch-and-bound optimizer that always returned the same "best" subset.
   function pickWeeklySet(pool, cap, people){
-    if(people.length===2){
-      return optimizeWeeklySubset2(pool, cap, people);
+    if(pool.length === 0) return [];
+    const wantsSplit = people.length === 2;
+
+    // Aim for enough samples to see meaningful diversity. Bounded so this
+    // stays snappy even for larger pools.
+    const targetSamples = Math.min(60, Math.max(20, pool.length * 3));
+
+    const candidates = [];
+    const seen = new Set();
+    for(let i = 0; i < targetSamples; i++){
+      const s = drawToCapRandom(pool, cap);
+      if(!s.length) continue;
+      // Dedupe on the set of ids so we count distinct subsets, not draws
+      const key = s.map(x => x.id).sort().join('|');
+      if(seen.has(key)) continue;
+      seen.add(key);
+
+      const totalW = s.reduce((a, x) => a + (x.weight || 0), 0);
+      const splitDiff = wantsSplit ? minSplitDiff(s) : 0;
+      candidates.push({ subset: s, totalW, splitDiff });
     }
-    return drawToCapRandom(pool, cap);
+
+    if(!candidates.length) return drawToCapRandom(pool, cap);
+
+    // Prefer subsets that can be split within tolerance. If none, use all.
+    const splittable = candidates.filter(c => c.splitDiff <= WEEK_TOL + 1e-9);
+    const bucket = splittable.length ? splittable : candidates;
+
+    // Uniform random over the qualifying bucket
+    return bucket[Math.floor(Math.random() * bucket.length)].subset;
+  }
+
+  // Returns the minimum |sum - 2*s| across all achievable subset sums s
+  // (i.e., the best possible weekly split diff). Uses bit-DP in half-units.
+  function minSplitDiff(items){
+    if(items.length === 0) return 0;
+    const wU = items.map(i => Math.max(1, Math.round((i.weight || 0) * 2)));
+    const total = wU.reduce((a, b) => a + b, 0);
+    let dp = 1n;
+    for(const w of wU){
+      dp = dp | (dp << BigInt(w));
+    }
+    let bestDiffU = Infinity;
+    for(let s = 0; s <= total; s++){
+      if(((dp >> BigInt(s)) & 1n) === 1n){
+        const diff = Math.abs(total - 2 * s);
+        if(diff < bestDiffU) bestDiffU = diff;
+      }
+    }
+    return bestDiffU / 2;
   }
 
   function drawToCapRandom(pool, cap){
@@ -718,62 +926,16 @@
     return list[list.length-1];
   }
 
-  function optimizeWeeklySubset2(pool, cap, people){
-    const capU=Math.max(1,Math.floor(cap*2));
-    const T=Math.round(WEEK_TOL*2);
-
-    const items=pool
-      .map(it=>({it,wU:Math.max(1,Math.round((it.weight||0)*2))}))
-      .filter(x=>x.wU<=capU);
-
-    let best=null;
-
-    function better(a,b){
-      if(!a) return true;
-      if(a.hasTol!==b.hasTol) return b.hasTol;
-      if(a.capGap!==b.capGap) return b.capGap<a.capGap;
-      if(a.weekDiffU!==b.weekDiffU) return b.weekDiffU<a.weekDiffU;
-      if(a.sumU!==b.sumU) return b.sumU>a.sumU;
-      return false;
+  // Recency lookup: returns the most recent owner of this task from the doneLog,
+  // or null if we don't have a record with one of the current people as owner.
+  function recencyLastOwner(taskId, people){
+    const log = Array.isArray(state.doneLog) ? state.doneLog : [];
+    for(let i = log.length - 1; i >= 0; i--){
+      const ev = log[i];
+      if(!ev || ev.id !== taskId) continue;
+      if(ev.owner && people.indexOf(ev.owner) !== -1) return ev.owner;
     }
-
-    function evalSubset(sumU, dp, mask){
-      if(sumU===0) return;
-      let bestDiffU=Infinity;
-      for(let sU=0;sU<=sumU;sU++){
-        if(((dp>>sU)&1)!==1) continue;
-        const diffU=Math.abs(sumU-2*sU);
-        if(diffU<bestDiffU) bestDiffU=diffU;
-      }
-      const cand={
-        hasTol: bestDiffU<=T,
-        capGap: (capU-sumU),
-        weekDiffU: bestDiffU,
-        sumU,
-        mask
-      };
-      if(better(best,cand)) best=cand;
-    }
-
-    function dfs(i, sumU, dp, mask){
-      if(sumU>capU) return;
-      if(mask) evalSubset(sumU, dp, mask);
-      if(i>=items.length) return;
-      const wU=items[i].wU;
-      dfs(i+1, sumU+wU, (dp<<wU)|dp, mask|(1<<i));
-      dfs(i+1, sumU, dp, mask);
-    }
-
-    if(items.length>24){
-      return drawToCapRandom(pool, cap);
-    }
-
-    dfs(0,0,1,0);
-    if(!best) return drawToCapRandom(pool, cap);
-
-    const out=[];
-    for(let i=0;i<items.length;i++) if((best.mask&(1<<i))!==0) out.push(items[i].it);
-    return out.length? out : drawToCapRandom(pool, cap);
+    return null;
   }
 
   function fairAssign(items, people){
@@ -785,28 +947,60 @@
       const weights=items.map(i=>i.weight||0);
       const W=weights.reduce((s,w)=>s+w,0);
       const n=items.length;
-      if(n<=26){
-        let bestMask=0;
-        let best={hasTol:false,weekDiff:1e9,targetDiff:1e9};
-        const target=W/2;
+
+      // Who did each task most recently? Used to encourage rotation.
+      const lastOwner = items.map(it => recencyLastOwner(it.id, people));
+
+      if(n<=22){
+        // Enumerate every possible split; track fairness and rotation score.
+        // rotationScore = # of items assigned to whoever did NOT do it last.
+        let minWeekDiff = Infinity;
+        const scored = [];
         for(let mask=0; mask<(1<<n); mask++){
-          let s=0;
-          for(let i=0;i<n;i++) if((mask&(1<<i))!==0) s+=weights[i];
-          const weekDiff=Math.abs(W-2*s);
-          const hasTol=weekDiff<=WEEK_TOL+1e-9;
-          const tdiff=Math.abs(target-s);
-          const cand={hasTol,weekDiff,targetDiff:tdiff};
-          const better=(cand.hasTol&&!best.hasTol)||
-            (cand.hasTol===best.hasTol && cand.weekDiff<best.weekDiff-1e-9)||
-            (cand.hasTol===best.hasTol && Math.abs(cand.weekDiff-best.weekDiff)<=1e-9 && cand.targetDiff<best.targetDiff-1e-9);
-          if(better){best=cand; bestMask=mask;}
+          let s = 0, rot = 0;
+          for(let i=0; i<n; i++){
+            const goesToA = (mask & (1<<i)) !== 0;
+            if(goesToA) s += weights[i];
+            const lo = lastOwner[i];
+            if(lo !== null){
+              // Reward when the assignee is NOT the previous owner
+              if((goesToA && lo === B) || (!goesToA && lo === A)) rot++;
+            }
+          }
+          const weekDiff = Math.abs(W - 2*s);
+          if(weekDiff < minWeekDiff) minWeekDiff = weekDiff;
+          scored.push({ mask, weekDiff, rot });
         }
-        return items.map((it,i)=>({...it,owner:((bestMask&(1<<i))!==0)?A:B}));
+
+        // Any split within tolerance of the best is "fair enough" for this week.
+        // Widen to at least WEEK_TOL so a small imbalance never forces a
+        // rotation-blind choice.
+        const wdCeiling = Math.max(minWeekDiff, WEEK_TOL) + 1e-9;
+        const fair = scored.filter(m => m.weekDiff <= wdCeiling);
+
+        // Among fair splits, prefer maximum rotation (rotate as many chores
+        // away from their most recent owner as possible).
+        let maxRot = -Infinity;
+        for(const m of fair) if(m.rot > maxRot) maxRot = m.rot;
+        const topRot = fair.filter(m => m.rot === maxRot);
+
+        // Random tiebreak so we don't lock into the same "best" every draw.
+        const chosen = topRot[Math.floor(Math.random() * topRot.length)];
+        return items.map((it,i) => ({...it, owner: ((chosen.mask & (1<<i)) !== 0) ? A : B}));
       }
     }
 
+    // Fallback for >2 people or n>22: shuffled greedy (also now randomized).
+    const shuffled = [...items];
+    for(let i = shuffled.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    // After shuffle, keep the load-balancing heuristic (heaviest first) so
+    // week totals stay close, but the randomized order still varies who wins ties.
+    shuffled.sort((a,b)=>(b.weight||0)-(a.weight||0));
     const weekTotals=new Map(people.map(p=>[p,0]));
-    return [...items].sort((a,b)=>(b.weight||0)-(a.weight||0)).map(it=>{
+    return shuffled.map(it=>{
       let pick=people[0], min=Infinity;
       for(const p of people){
         const sc=weekTotals.get(p)||0;
@@ -851,7 +1045,38 @@
     const progress = (doneWeight + backlogWeight) > 0 ? (doneWeight/(doneWeight+backlogWeight)) : 0;
     progressBar.style.width = Math.round(progress*100)+'%';
 
-    cycleStats.textContent = 'Done '+doneWeight.toFixed(1)+' wt • Outstanding '+openTasks.length+' • Due '+due.length+' • Assigned '+assignedWeight.toFixed(1)+' wt';
+    // Per-person weight this cycle (assigned + already-done). Helps spot
+    // imbalance across the cycle at a glance.
+    const people = readPeople();
+    const personTotals = new Map(people.map(p => [p, 0]));
+    // From assignment history batches this cycle
+    for(const h of batchesThisCycle){
+      for(const it of (h.items || [])){
+        if(it.owner && personTotals.has(it.owner)){
+          personTotals.set(it.owner, personTotals.get(it.owner) + (it.weight || 0));
+        }
+      }
+    }
+    // Include completions this cycle whose owner didn't come through a batch
+    // (e.g., marked done directly from the manage table)
+    const doneLog0 = Array.isArray(state.doneLog) ? state.doneLog : [];
+    const seenInBatch = new Set();
+    for(const h of batchesThisCycle){
+      for(const it of (h.items || [])){
+        if(it.owner) seenInBatch.add(it.id + '|' + it.owner);
+      }
+    }
+    for(const ev of doneLog0){
+      if(!ev || !ev.owner || !personTotals.has(ev.owner)) continue;
+      if(ev.ts < cycleStart || ev.ts > now) continue;
+      if(seenInBatch.has(ev.id + '|' + ev.owner)) continue;
+      personTotals.set(ev.owner, personTotals.get(ev.owner) + (ev.weight || 0));
+    }
+    const balanceStr = people.length
+      ? ' • ' + people.map(p => escapeHtml(p) + ' ' + (personTotals.get(p) || 0).toFixed(1)).join(' / ')
+      : '';
+
+    cycleStats.innerHTML = 'Done '+doneWeight.toFixed(1)+' wt • Outstanding '+openTasks.length+' • Due '+due.length+' • Assigned '+assignedWeight.toFixed(1)+' wt'+balanceStr;
 
     // Outstanding
     outstandingEl.innerHTML='';
@@ -912,6 +1137,312 @@
       .forEach(t=> dueEl.appendChild(taskCard(t, {mode:'due'})));
 
     renderTable();
+    // Refresh history-tab data too so it stays in sync even when hidden
+    renderHistory();
+  }
+
+  // Collect every draw batch across all months as a flat, sortable list.
+  // Returns entries shaped like: { ts, items:[{id,name,weight,owner}], total, finish, monthKey }
+  function getAllBatchesFlat(){
+    const out = [];
+    for(const [mk, mm] of Object.entries(state.months || {})){
+      const hist = (mm && mm.history) ? mm.history : [];
+      for(const h of hist){
+        out.push({
+          ts: h.ts || 0,
+          items: h.items || [],
+          total: h.total || 0,
+          finish: !!h.finish,
+          monthKey: mk,
+        });
+      }
+    }
+    // Newest first
+    out.sort((a,b) => (b.ts||0) - (a.ts||0));
+    return out;
+  }
+
+  // For grouping past draws by cycle. Uses the current cycle mode/weeks,
+  // which is the same math the rest of the app uses for "the cycle a
+  // timestamp belongs to". Independent from state.cycleStartTs, which only
+  // reflects the ACTIVE cycle.
+  function cycleStartForTs(ts){
+    if(getCycleMode() === 'rolling'){
+      return rollingCycleStartTs(ts, getWeeksPerCycle());
+    }
+    return monthlyCycleStartTs(ts);
+  }
+
+  function renderHistory(){
+    const batches = getAllBatchesFlat();
+    const doneLog = Array.isArray(state.doneLog) ? state.doneLog : [];
+
+    // Discover people we've ever assigned to (from batches + doneLog + current input)
+    const peopleSet = new Set(readPeople());
+    for(const b of batches) for(const it of b.items) if(it.owner) peopleSet.add(it.owner);
+    for(const ev of doneLog) if(ev && ev.owner) peopleSet.add(ev.owner);
+    const allPeople = Array.from(peopleSet).sort();
+
+    // Build the chore filter list from batch items + current chores
+    const choresById = new Map();
+    for(const c of chores) choresById.set(c.id, c.name);
+    for(const b of batches) for(const it of b.items){
+      if(!choresById.has(it.id)) choresById.set(it.id, it.name);
+    }
+    const allChores = Array.from(choresById.entries()).sort((a,b)=>a[1].localeCompare(b[1]));
+
+    // Refresh filter dropdowns while preserving current selection
+    syncSelectOptions(historyFilterPerson, [['', 'Anyone']].concat(allPeople.map(p => [p, p])));
+    syncSelectOptions(historyFilterChore, [['', 'Any chore']].concat(allChores));
+
+    const filterPerson = historyFilterPerson.value || '';
+    const filterChore  = historyFilterChore.value || '';
+    const groupBy      = historyGroupBy.value || 'cycle';
+
+    // ---- All-time totals (per person). Uses all batches (assigned) and all
+    // doneLog entries (completed) so users can see both the intent and the
+    // actual follow-through.
+    const perPersonAssigned = new Map();
+    const perPersonAssignedCount = new Map();
+    for(const b of batches){
+      for(const it of b.items){
+        if(!it.owner) continue;
+        perPersonAssigned.set(it.owner, (perPersonAssigned.get(it.owner) || 0) + (it.weight || 0));
+        perPersonAssignedCount.set(it.owner, (perPersonAssignedCount.get(it.owner) || 0) + 1);
+      }
+    }
+    const perPersonDone = new Map();
+    const perPersonDoneCount = new Map();
+    for(const ev of doneLog){
+      if(!ev || !ev.owner) continue;
+      perPersonDone.set(ev.owner, (perPersonDone.get(ev.owner) || 0) + (ev.weight || 0));
+      perPersonDoneCount.set(ev.owner, (perPersonDoneCount.get(ev.owner) || 0) + 1);
+    }
+    historyTotalsEl.innerHTML = '';
+    const totalPeople = new Set([...perPersonAssigned.keys(), ...perPersonDone.keys(), ...allPeople]);
+    historyTotalsMeta.textContent = totalPeople.size
+      ? (batches.length + ' draws • ' + doneLog.length + ' completions • across ' + totalPeople.size + ' people')
+      : 'No history yet';
+    const sortedPeople = Array.from(totalPeople).sort((a,b)=>{
+      const wa = perPersonAssigned.get(a) || 0, wb = perPersonAssigned.get(b) || 0;
+      return wb - wa;
+    });
+    for(const p of sortedPeople){
+      const card = document.createElement('div');
+      card.className = 'totals-card';
+      const assignedW = perPersonAssigned.get(p) || 0;
+      const assignedN = perPersonAssignedCount.get(p) || 0;
+      const doneW = perPersonDone.get(p) || 0;
+      const doneN = perPersonDoneCount.get(p) || 0;
+      card.innerHTML = ''
+        + '<h4>' + escapeHtml(p) + '</h4>'
+        + '<div class="totals-row"><span class="k">Assigned</span><span class="v">' + assignedN + ' chores / ' + assignedW.toFixed(1) + ' wt</span></div>'
+        + '<div class="totals-row"><span class="k">Completed</span><span class="v">' + doneN + ' chores / ' + doneW.toFixed(1) + ' wt</span></div>';
+      historyTotalsEl.appendChild(card);
+    }
+
+    // ---- Filtered batches
+    const filtered = batches.filter(b=>{
+      if(filterPerson){
+        if(!b.items.some(it => it.owner === filterPerson)) return false;
+      }
+      if(filterChore){
+        if(!b.items.some(it => it.id === filterChore)) return false;
+      }
+      return true;
+    });
+
+    historyMeta.textContent = filtered.length
+      ? (filtered.length + ' draw' + (filtered.length===1?'':'s')
+          + (filterPerson || filterChore ? ' (filtered from ' + batches.length + ')' : ''))
+      : (batches.length ? 'No draws match the filter' : 'No draws yet');
+
+    // ---- Group and render
+    historyListEl.innerHTML = '';
+    const groups = groupBatches(filtered, groupBy);
+    for(const g of groups){
+      historyListEl.appendChild(renderHistoryGroup(g, filterPerson, filterChore));
+    }
+
+    // ---- Completion log (chronological, most recent 100 by default)
+    renderCompletionLog(doneLog, filterPerson, filterChore);
+  }
+
+  function syncSelectOptions(sel, pairs){
+    const prev = sel.value;
+    // Only replace if the options actually changed to avoid focus/scroll churn
+    const wanted = pairs.map(p => p[0]+'::'+p[1]).join('|');
+    if(sel.dataset._sig === wanted) return;
+    sel.dataset._sig = wanted;
+    sel.innerHTML = '';
+    for(const [val, label] of pairs){
+      const o = document.createElement('option');
+      o.value = val;
+      o.textContent = label;
+      sel.appendChild(o);
+    }
+    // Restore previous selection if still available
+    const stillThere = pairs.some(p => p[0] === prev);
+    sel.value = stillThere ? prev : '';
+  }
+
+  function groupBatches(batches, groupBy){
+    if(groupBy === 'none'){
+      return [{ key:'all', label:'All draws', batches: batches.slice() }];
+    }
+    const map = new Map();
+    for(const b of batches){
+      let key, label;
+      if(groupBy === 'month'){
+        const d = new Date(b.ts);
+        key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+        label = d.toLocaleDateString([], {year:'numeric', month:'long'});
+      } else {
+        // 'cycle' — group by the cycle boundary that CONTAINS the timestamp
+        const cs = cycleStartForTs(b.ts);
+        const ce = nextCycleStartTs(cs);
+        key = 'cycle-' + cs;
+        const s = new Date(cs), e = new Date(ce - MS_DAY);
+        const fmt = d => d.toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'});
+        label = fmt(s) + ' – ' + fmt(e);
+      }
+      if(!map.has(key)) map.set(key, { key, label, batches: [], firstTs: b.ts });
+      const g = map.get(key);
+      g.batches.push(b);
+      // Track group ordering by the newest ts in it
+      if(b.ts > g.firstTs) g.firstTs = b.ts;
+    }
+    return Array.from(map.values()).sort((a,b) => b.firstTs - a.firstTs);
+  }
+
+  function renderHistoryGroup(group, filterPerson, filterChore){
+    const wrap = document.createElement('div');
+    wrap.className = 'history-cycle';
+    wrap.dataset.groupKey = group.key;
+    const collapsed = historyCollapsed.get(group.key) === true;
+    if(collapsed) wrap.classList.add('collapsed');
+
+    const groupTotal = group.batches.reduce((s,b) => s + (b.total || 0), 0);
+    const groupItems = group.batches.reduce((s,b) => s + (b.items || []).length, 0);
+
+    // Per-person totals inside this group (respecting the person filter)
+    const perPerson = new Map();
+    for(const b of group.batches){
+      for(const it of b.items){
+        if(filterPerson && it.owner !== filterPerson) continue;
+        if(filterChore && it.id !== filterChore) continue;
+        if(!it.owner) continue;
+        perPerson.set(it.owner, (perPerson.get(it.owner) || 0) + (it.weight || 0));
+      }
+    }
+    const balanceStr = perPerson.size
+      ? ' • ' + Array.from(perPerson.entries()).map(([p,w]) => escapeHtml(p)+' '+w.toFixed(1)).join(' / ')
+      : '';
+
+    const header = document.createElement('div');
+    header.className = 'history-cycle-header';
+    header.innerHTML = ''
+      + '<div><strong>' + escapeHtml(group.label) + '</strong>'
+      + '<div class="muted" style="margin-top:2px">'
+      +   group.batches.length + ' draw' + (group.batches.length===1?'':'s')
+      + ' • ' + groupItems + ' item' + (groupItems===1?'':'s')
+      + ' • total ' + groupTotal.toFixed(1) + ' wt'
+      + balanceStr
+      + '</div></div>'
+      + '<div class="history-caret">▾</div>';
+    header.addEventListener('click', ()=>{
+      const nowCollapsed = !wrap.classList.contains('collapsed');
+      historyCollapsed.set(group.key, nowCollapsed);
+      wrap.classList.toggle('collapsed', nowCollapsed);
+    });
+    wrap.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'history-cycle-body';
+    // Batches within group: newest first
+    const sortedBatches = group.batches.slice().sort((a,b) => (b.ts||0)-(a.ts||0));
+    for(const b of sortedBatches){
+      body.appendChild(renderBatchCard(b, filterPerson, filterChore));
+    }
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  function renderBatchCard(b, filterPerson, filterChore){
+    const card = document.createElement('div');
+    card.className = 'history-batch';
+    const d = new Date(b.ts);
+    const when = d.toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+    const tag = b.finish ? ' • Finish-due' : '';
+
+    const meta = document.createElement('div');
+    meta.className = 'history-batch-meta';
+    meta.innerHTML = ''
+      + '<span>' + escapeHtml(when) + tag + '</span>'
+      + '<span>' + b.items.length + ' item' + (b.items.length===1?'':'s')
+      + ' • ' + (b.total || 0).toFixed(1) + ' wt</span>';
+    card.appendChild(meta);
+
+    // Items — sort by owner then weight desc for readability
+    const items = b.items.slice().sort((a,b) => {
+      const oa = (a.owner || '~').toLowerCase();
+      const ob = (b.owner || '~').toLowerCase();
+      if(oa !== ob) return oa.localeCompare(ob);
+      return (b.weight||0) - (a.weight||0);
+    });
+    for(const it of items){
+      // Grey out items filtered out (so the batch is still readable in context)
+      const dim = (filterPerson && it.owner !== filterPerson) || (filterChore && it.id !== filterChore);
+      const row = document.createElement('div');
+      row.className = 'history-item';
+      if(dim) row.style.opacity = '0.35';
+      const ownerHtml = it.owner
+        ? '<span class="item-owner">' + escapeHtml(it.owner) + '</span>'
+        : '<span class="item-owner no-owner">unassigned</span>';
+      row.innerHTML = ''
+        + '<span>' + escapeHtml(it.name || it.id) + '</span>'
+        + '<span class="item-weight">' + (it.weight||0).toFixed(1) + ' wt</span>'
+        + ownerHtml;
+      card.appendChild(row);
+    }
+    return card;
+  }
+
+  function renderCompletionLog(doneLog, filterPerson, filterChore){
+    historyCompletionsEl.innerHTML = '';
+    const filtered = doneLog.slice().filter(ev=>{
+      if(!ev || typeof ev.ts !== 'number') return false;
+      if(filterPerson && ev.owner !== filterPerson) return false;
+      if(filterChore && ev.id !== filterChore) return false;
+      return true;
+    }).sort((a,b) => (b.ts||0)-(a.ts||0));
+
+    const SHOW_LIMIT = 100;
+    const shown = filtered.slice(0, SHOW_LIMIT);
+    historyCompletionsMeta.textContent = filtered.length
+      ? (filtered.length + ' completion' + (filtered.length===1?'':'s')
+          + (filtered.length > SHOW_LIMIT ? ' (showing latest ' + SHOW_LIMIT + ')' : ''))
+      : 'None';
+
+    if(!shown.length) return;
+
+    const card = document.createElement('div');
+    card.className = 'history-batch';
+    for(const ev of shown){
+      const d = new Date(ev.ts);
+      const when = d.toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+      const row = document.createElement('div');
+      row.className = 'history-item';
+      const ownerHtml = ev.owner
+        ? '<span class="item-owner">' + escapeHtml(ev.owner) + '</span>'
+        : '<span class="item-owner no-owner">no owner</span>';
+      row.innerHTML = ''
+        + '<span>' + escapeHtml(ev.name || ev.id) + '<br><span class="muted">' + escapeHtml(when) + '</span></span>'
+        + '<span class="item-weight">' + (ev.weight||0).toFixed(1) + ' wt</span>'
+        + ownerHtml;
+      card.appendChild(row);
+    }
+    historyCompletionsEl.appendChild(card);
   }
 
   function formatCycleLabel(cycleStart, cycleEnd){
@@ -1166,19 +1697,33 @@
   }
 
   // --------- Animation ---------
-  function animateDraw(items){
+  // Resolves with 'confirm' | 'reroll' | 'cancel' based on the user's choice
+  // after the animation completes. The overlay is only closed on confirm/cancel;
+  // on reroll it stays open (the outer loop calls animateDraw again).
+  function animateDraw(items, opts){
     return new Promise(async resolve=>{
       const overlay=document.getElementById('drawOverlay');
       const list=document.getElementById('drawList');
       const meta=document.getElementById('drawMeta');
       const skipBtn=document.getElementById('skipDraw');
       const drawBtn=document.getElementById('drawBtn');
+      const animActions=document.getElementById('drawActionsAnimating');
+      const decideActions=document.getElementById('drawActionsDecide');
+      const cancelBtn=document.getElementById('cancelDraw');
+      const rerollBtn=document.getElementById('rerollDraw');
+      const confirmBtn=document.getElementById('confirmDraw');
 
-      meta.textContent = items.length+' task'+(items.length!==1?'s':'')+' • cap '+getCap();
+      const rerollCount = (opts && typeof opts.rerollCount === 'number') ? opts.rerollCount : 0;
+      const rerollTag = rerollCount > 0 ? ' • reroll #' + rerollCount : '';
+      meta.textContent = items.length+' task'+(items.length!==1?'s':'')+' • cap '+getCap()+rerollTag;
       list.innerHTML='';
       overlay.classList.add('show');
       overlay.setAttribute('aria-hidden','false');
       if(drawBtn) drawBtn.disabled=true;
+
+      // While animating: show Skip, hide decision buttons
+      animActions.classList.remove('hidden');
+      decideActions.classList.add('hidden');
 
       let skipped=false;
       const onSkip=()=>{ skipped=true; };
@@ -1241,11 +1786,31 @@
         if(!skipped) await sleep(220);
       }
 
-      await sleep(250);
-      overlay.classList.remove('show');
-      overlay.setAttribute('aria-hidden','true');
-      if(drawBtn) drawBtn.disabled=false;
-      resolve();
+      // Animation complete — swap in decision buttons and wait for input
+      await sleep(150);
+      animActions.classList.add('hidden');
+      decideActions.classList.remove('hidden');
+
+      const finish = (action)=>{
+        // Detach all listeners so a reroll draws fresh handlers
+        cancelBtn.removeEventListener('click', onCancel);
+        rerollBtn.removeEventListener('click', onReroll);
+        confirmBtn.removeEventListener('click', onConfirm);
+        if(action === 'confirm' || action === 'cancel'){
+          overlay.classList.remove('show');
+          overlay.setAttribute('aria-hidden','true');
+          if(drawBtn) drawBtn.disabled=false;
+        }
+        // On reroll we leave the overlay open; the next animateDraw call
+        // will re-enter with a cleared list.
+        resolve(action);
+      };
+      const onCancel = ()=> finish('cancel');
+      const onReroll = ()=> finish('reroll');
+      const onConfirm = ()=> finish('confirm');
+      cancelBtn.addEventListener('click', onCancel);
+      rerollBtn.addEventListener('click', onReroll);
+      confirmBtn.addEventListener('click', onConfirm);
     });
   }
 
@@ -1470,6 +2035,218 @@
       if(mm && mm.history){
         mm.history = mm.history.filter(h => !(h.items||[]).some(it => it.id === tmpId));
       }
+    })();
+
+    // T9: pickWeeklySet produces varied subsets across repeated draws
+    (function(){
+      // Build a pool big enough to have real subset variety
+      const pool = [
+        {id:'z1',name:'Z1',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
+        {id:'z2',name:'Z2',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
+        {id:'z3',name:'Z3',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
+        {id:'z4',name:'Z4',weight:2,  cadenceDays:30,enabled:true,tags:[]},
+        {id:'z5',name:'Z5',weight:0.5,cadenceDays:30,enabled:true,tags:[]},
+        {id:'z6',name:'Z6',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
+        {id:'z7',name:'Z7',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
+        {id:'z8',name:'Z8',weight:1,  cadenceDays:30,enabled:true,tags:[]},
+        {id:'z9',name:'Z9',weight:2,  cadenceDays:30,enabled:true,tags:[]},
+        {id:'z10',name:'Z10',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
+      ];
+      const keys = new Set();
+      for(let i=0;i<10;i++){
+        const s = pickWeeklySet(pool, 8, ['Adam','Hannah']);
+        keys.add(s.map(x=>x.id).sort().join('|'));
+      }
+      // With genuine randomness we should see multiple distinct subsets in 10 draws
+      assert('T9 pickWeeklySet varies across draws (>=3 distinct)', keys.size >= 3);
+    })();
+
+    // T10: fairAssign uses recency to rotate — if Adam did it last, prefer Hannah this time
+    (function(){
+      // Add tasks and stage doneLog with Adam as recent owner on all of them
+      const testIds = ['zrot1','zrot2','zrot3','zrot4'];
+      for(const id of testIds){
+        chores.push({id,name:id.toUpperCase(),weight:2,cadenceDays:30,enabled:true,tags:[]});
+      }
+      if(!Array.isArray(state.doneLog)) state.doneLog=[];
+      const before = state.doneLog.length;
+      const nowT = Date.now();
+      for(const id of testIds){
+        state.doneLog.push({ts:nowT, id, name:id, weight:2, owner:'Adam'});
+      }
+      // Now fair-assign these 4 identical-weight items. Perfect split is 2/2.
+      // With Adam as previous owner of all, rotation prefers all -> Hannah in the
+      // weight-tie sense, but perfect 4/4 wt split forces 2 to Adam and 2 to Hannah.
+      // Rotation-optimal is: 2 items to Hannah (rotates 2), 2 to Adam (no rotation).
+      // Any split will have rot=2 (whichever 2 go to Hannah). So we just verify
+      // the weight is split 4-4 and rotation score is maxed (2).
+      const items = testIds.map(id => ({id,name:id.toUpperCase(),weight:2}));
+      // Run many times; verify (a) weight balanced, (b) not always the same split
+      const seenAssigns = new Set();
+      let balancedCount = 0;
+      for(let i=0;i<10;i++){
+        const out = fairAssign(items, ['Adam','Hannah']);
+        const adamW = out.filter(x=>x.owner==='Adam').reduce((s,x)=>s+x.weight,0);
+        const hanW  = out.filter(x=>x.owner==='Hannah').reduce((s,x)=>s+x.weight,0);
+        if(Math.abs(adamW - hanW) <= WEEK_TOL) balancedCount++;
+        seenAssigns.add(out.map(x=>x.owner).join('|'));
+      }
+      assert('T10 fairAssign keeps balance (≤0.5 diff) across all draws', balancedCount === 10);
+      assert('T10 fairAssign varies assignment across draws (>=2 distinct)', seenAssigns.size >= 2);
+
+      // Clean up
+      chores = chores.filter(c => !testIds.includes(c.id));
+      state.doneLog = state.doneLog.slice(0, before);
+    })();
+
+    // T11: recency preference — when weights are lopsided and rotation is compatible with fairness,
+    // the recently-done item should flip owners
+    (function(){
+      // Two items of equal weight. Adam did both last time. Any 1/1 split is fair.
+      // Both possible splits have rot=1 (one to Hannah, one to Adam). So we expect
+      // a ~50/50 distribution over draws, but the rotation score is maxed either way.
+      // Better test: 3 items, one heavier. Adam did the light one last.
+      // Split "light -> Adam, heavies -> Hannah" is unbalanced.
+      // Split "heavies split, light to Hannah" — one heavy A, one heavy B, light B: rot for light = 1
+      // Split "heavies split, light to Adam" — light Adam: rot for light = 0
+      // Fair splits: A gets one 2.0 + light 1 = 3.0, B gets one 2.0 = 2.0. Diff = 1. Not tolerable.
+      // Or A gets 2.0, B gets 2.0 + 1.0. Diff = 1. Not tolerable either.
+      // Only fair split is A=2.0+1.0/2 vs B=... hmm weights don't allow perfect. Let me redesign.
+      //
+      // Cleaner setup: 2 items, weight 1 each. Adam did item1 last. Hannah did item2 last.
+      // Fair split (1-1) has one item to each person. Two options:
+      //   Option X: item1->Adam, item2->Hannah (rot=0)
+      //   Option Y: item1->Hannah, item2->Adam (rot=2)
+      // Y has strictly better rotation, so it should be chosen deterministically.
+      const testIds = ['zrec1','zrec2'];
+      for(const id of testIds){
+        chores.push({id,name:id.toUpperCase(),weight:1,cadenceDays:30,enabled:true,tags:[]});
+      }
+      if(!Array.isArray(state.doneLog)) state.doneLog=[];
+      const before = state.doneLog.length;
+      const nowT = Date.now();
+      state.doneLog.push({ts:nowT-1000, id:'zrec1', name:'ZREC1', weight:1, owner:'Adam'});
+      state.doneLog.push({ts:nowT, id:'zrec2', name:'ZREC2', weight:1, owner:'Hannah'});
+
+      const items = [
+        {id:'zrec1',name:'ZREC1',weight:1},
+        {id:'zrec2',name:'ZREC2',weight:1},
+      ];
+      // Verify rotation preferred: item1 always goes to Hannah, item2 always to Adam
+      let allRotated = true;
+      for(let i=0;i<10;i++){
+        const out = fairAssign(items, ['Adam','Hannah']);
+        const a = out.find(x=>x.id==='zrec1');
+        const b = out.find(x=>x.id==='zrec2');
+        if(!(a.owner === 'Hannah' && b.owner === 'Adam')){ allRotated = false; break; }
+      }
+      assert('T11 fairAssign rotates when strictly better than status quo', allRotated);
+
+      chores = chores.filter(c => !testIds.includes(c.id));
+      state.doneLog = state.doneLog.slice(0, before);
+    })();
+
+    // T12: minSplitDiff correctness
+    (function(){
+      const items1 = [{weight:2},{weight:2}]; // splittable 2/2, diff=0
+      assert('T12 minSplitDiff([2,2]) === 0', minSplitDiff(items1) === 0);
+      const items2 = [{weight:1},{weight:2},{weight:3}]; // splittable {3}/{1+2}, diff=0
+      assert('T12 minSplitDiff([1,2,3]) === 0', minSplitDiff(items2) === 0);
+      const items3 = [{weight:1},{weight:1},{weight:1}]; // best is {1+1}/{1}, diff=1
+      assert('T12 minSplitDiff([1,1,1]) === 1', minSplitDiff(items3) === 1);
+    })();
+
+    // T13: getAllBatchesFlat aggregates across months and sorts newest first
+    (function(){
+      const mkA = '9999-01', mkB = '9999-02';
+      const savedA = state.months[mkA];
+      const savedB = state.months[mkB];
+      state.months[mkA] = { history: [
+        { ts: 1000, items: [], total: 0 },
+        { ts: 3000, items: [], total: 0 },
+      ]};
+      state.months[mkB] = { history: [
+        { ts: 2000, items: [], total: 0 },
+      ]};
+      const flat = getAllBatchesFlat();
+      // At least the 3 we just added, and they must be sorted newest-first
+      // relative to each other (there may be real data too, we only check ours).
+      const ours = flat.filter(b => b.ts === 1000 || b.ts === 2000 || b.ts === 3000);
+      assert('T13 getAllBatchesFlat aggregates across months', ours.length === 3);
+      assert('T13 getAllBatchesFlat sorts newest-first', ours[0].ts === 3000 && ours[1].ts === 2000 && ours[2].ts === 1000);
+      // cleanup
+      if(savedA === undefined) delete state.months[mkA]; else state.months[mkA] = savedA;
+      if(savedB === undefined) delete state.months[mkB]; else state.months[mkB] = savedB;
+    })();
+
+    // T14: groupBatches by cycle groups timestamps within the same cycle boundary
+    (function(){
+      const savedMode = state.cycleMode;
+      const savedWeeks = state.weeksPerCycle;
+      state.cycleMode = 'rolling';
+      state.weeksPerCycle = 4;
+      const now = Date.now();
+      const cs = currentCycleStartTs(now);
+      // Two batches in current cycle, one in previous cycle
+      const batches = [
+        { ts: cs + 100, items: [], total: 0 },
+        { ts: cs + 1000000, items: [], total: 0 },
+        { ts: cs - 1000, items: [], total: 0 },
+      ];
+      const groups = groupBatches(batches, 'cycle');
+      assert('T14 groupBatches by cycle produces 2 groups', groups.length === 2);
+      // Newest group should have 2 batches (current cycle)
+      assert('T14 groupBatches newest group has 2 batches', groups[0].batches.length === 2);
+      // Older group should have 1 (previous cycle)
+      assert('T14 groupBatches older group has 1 batch', groups[1].batches.length === 1);
+      state.cycleMode = savedMode;
+      state.weeksPerCycle = savedWeeks;
+    })();
+
+    // T15: groupBatches by month uses YYYY-MM key from timestamp
+    (function(){
+      const b1 = { ts: new Date(2024, 0, 15).getTime(), items: [], total: 0 };
+      const b2 = { ts: new Date(2024, 0, 25).getTime(), items: [], total: 0 };
+      const b3 = { ts: new Date(2024, 1, 10).getTime(), items: [], total: 0 };
+      const groups = groupBatches([b1,b2,b3], 'month');
+      assert('T15 groupBatches by month produces 2 groups', groups.length === 2);
+      const jan = groups.find(g => g.batches.some(x => x.ts === b1.ts));
+      assert('T15 January group contains both January batches', jan && jan.batches.length === 2);
+    })();
+
+    // T16: groupBatches with 'none' returns a single group containing all
+    (function(){
+      const batches = [
+        { ts: 100, items: [], total: 0 },
+        { ts: 200, items: [], total: 0 },
+      ];
+      const groups = groupBatches(batches, 'none');
+      assert('T16 groupBatches none returns 1 group', groups.length === 1);
+      assert('T16 groupBatches none has all batches', groups[0].batches.length === 2);
+    })();
+
+    // T17: assignBatch is the ONLY thing that persists a draw. Simulating
+    // reroll (calling pick/assign multiple times without assignBatch)
+    // must not mutate state.months history.
+    (function(){
+      const m = monthKey();
+      if(!state.months[m]) state.months[m] = { history: [] };
+      const before = state.months[m].history.length;
+      // Simulate three picks (like Reroll x2 then Cancel):
+      const testChores = [
+        {id:'zroll1',name:'Zroll1',weight:2,cadenceDays:30,enabled:true,tags:[]},
+        {id:'zroll2',name:'Zroll2',weight:2,cadenceDays:30,enabled:true,tags:[]},
+        {id:'zroll3',name:'Zroll3',weight:1,cadenceDays:30,enabled:true,tags:[]},
+      ];
+      const p1 = pickWeeklySet(testChores, 8, ['Adam','Hannah']);
+      fairAssign(p1, ['Adam','Hannah']);
+      const p2 = pickWeeklySet(testChores, 8, ['Adam','Hannah']);
+      fairAssign(p2, ['Adam','Hannah']);
+      const p3 = pickWeeklySet(testChores, 8, ['Adam','Hannah']);
+      fairAssign(p3, ['Adam','Hannah']);
+      // No assignBatch calls happened → history unchanged
+      const after = state.months[m].history.length;
+      assert('T17 pick/assign without assignBatch does NOT persist', after === before);
     })();
 
     save(LS_STATE,state);
