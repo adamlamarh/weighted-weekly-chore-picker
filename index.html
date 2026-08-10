@@ -1113,7 +1113,7 @@
 
     const completedList = Array.from(latestById.values()).sort((a,b)=>b.ts-a.ts);
     completedMeta.textContent = completedList.length ? (completedList.length+' completed this cycle') : 'None yet';
-    completedList.slice(0,12).forEach(ev=>{
+    completedList.slice(0,24).forEach(ev=>{
       const t=getTaskById(ev.id);
       if(t) completedEl.appendChild(taskCard({...t, owner: ev.owner || getOwnerForTask(t.id), _completedTs: ev.ts}, {mode:'completed'}));
     });
