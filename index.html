@@ -324,6 +324,22 @@
   const LS_OLD_DATA='choresDeck_v1_data';
   const LS_OLD_STATE='choresDeck_v1_state';
   const WEEK_TOL=0.5; // weekly fairness tolerance (±0.5)
+
+  // --------- Cadence-as-a-promise knobs ---------
+  // Share of the weekly cap handed to the most-overdue chores before the
+  // lottery runs. 0 = pure lottery (the old behavior), 1 = pure triage.
+  const PROMISE_RESERVE = 0.5;
+  // How hard the lottery half leans toward overdue chores. 0 = flat (old behavior).
+  const URGENCY_TILT = 1.0;
+  // Ratios are bucketed before ranking, so chores that are late by
+  // indistinguishable amounts are treated as tied and shuffled instead of being
+  // ordered by fourth-decimal noise (which would lock the same chores in every
+  // week). 0.25 = quarter of a cadence period.
+  const PROMISE_BUCKET = 0.25;
+  // A chore that has never been done is treated as this many periods late.
+  const NEVER_DONE_RATIO = 1;
+  // Ids the self-tests use as fixtures; never real chores.
+  const TEST_ID_RE = /^(__t_|ztest-|zrot\d|zrec\d|zroll\d)/;
   const DEFAULT_CADENCE_DAYS=30;
   const DEFAULT_CYCLE_MODE='rolling'; // 'rolling' | 'monthly'
   const DEFAULT_WEEKS_PER_CYCLE=4;
@@ -778,6 +794,21 @@
     renderAll();
   });
 
+  // One-time hygiene at boot: drop self-test fixtures that leaked into saved
+  // data in earlier versions. This runs once per load and BEFORE the first
+  // render, so it never fights the test suite's own fixtures further down.
+  (function purgeLeakedTestRows(){
+    const before = chores.length;
+    chores = chores.filter(c => !TEST_ID_RE.test(String((c && c.id) || '')));
+    if(chores.length !== before){
+      for(const k of Object.keys(state.meta || {})) if(TEST_ID_RE.test(k)) delete state.meta[k];
+      for(const k of Object.keys(state.open || {})) if(TEST_ID_RE.test(k)) delete state.open[k];
+      save(LS_DATA, chores);
+      save(LS_STATE, state);
+      console.log('[Chores] removed ' + (before - chores.length) + ' leaked self-test row(s) from saved data.');
+    }
+  })();
+
   uiReady = true;
   syncCycleInputs();
   renderAll();
@@ -849,6 +880,15 @@
       const tags = Array.isArray(c.tags)? c.tags.filter(Boolean) : [];
       const enabled = (c.enabled === false) ? false : true;
       return { id, name, weight, cadenceDays, tags, enabled };
+    });
+
+    // Collapse duplicate ids. Duplicates share a single state key, so they can
+    // never be assigned, completed or snoozed independently anyway.
+    const seenChoreIds = new Set();
+    chores = chores.filter(c => {
+      if(seenChoreIds.has(c.id)) return false;
+      seenChoreIds.add(c.id);
+      return true;
     });
 
     // Drop open/meta/assignments for missing ids
@@ -1184,12 +1224,23 @@
   // Picks a subset of the pool that (a) fits under the weekly cap and
   // (b) — when there are 2 people — can be split fairly between them.
   //
-  // Randomness: we generate multiple candidate subsets via drawToCapRandom
-  // (which is genuinely random & weight-biased), then pick one at random from
-  // those that split fairly.
+  // Two tiers, so cadence is a promise and the draw still feels like a draw:
+  //
+  //   1. The promise tier takes a reserved slice of the cap (PROMISE_RESERVE)
+  //      and hands it to whatever is furthest past due *relative to its own
+  //      cadence*. That ordering is the whole fix: a 7-day chore two weeks late
+  //      outranks a 30-day chore four days late, so short-cadence chores stop
+  //      losing a lottery they were never weighted to win.
+  //   2. The rest of the cap is the old weighted lottery, lightly tilted toward
+  //      overdue chores.
+  //
+  // The promise tier is computed ONCE per draw, so every candidate subset
+  // contains it and the fairness split still reasons about the whole week.
   function pickWeeklySet(pool, cap, people){
     if(pool.length === 0) return [];
+    const now = Date.now();
     const wantsSplit = people.length === 2;
+    const promised = promiseTier(pool, cap, now);
 
     // Aim for enough samples to see meaningful diversity. Bounded so this
     // stays snappy even for larger pools.
@@ -1198,7 +1249,7 @@
     const candidates = [];
     const seen = new Set();
     for(let i = 0; i < targetSamples; i++){
-      const s = drawToCapRandom(pool, cap);
+      const s = drawToCapRandom(pool, cap, promised, now);
       if(!s.length) continue;
       // Dedupe on the set of ids so we count distinct subsets, not draws
       const key = s.map(x => x.id).sort().join('|');
@@ -1210,7 +1261,7 @@
       candidates.push({ subset: s, totalW, splitDiff });
     }
 
-    if(!candidates.length) return drawToCapRandom(pool, cap);
+    if(!candidates.length) return drawToCapRandom(pool, cap, promised, now);
 
     // Prefer subsets that can be split within tolerance. If none, use all.
     const splittable = candidates.filter(c => c.splitDiff <= WEEK_TOL + 1e-9);
@@ -1240,15 +1291,75 @@
     return bestDiffU / 2;
   }
 
-  function drawToCapRandom(pool, cap){
-    const remaining=pool.slice();
-    const picked=[];
-    let total=0;
+  // --------- Urgency: cadence as a promise ---------
+  // How many cadence periods past due a chore is, normalized by its OWN
+  // cadence. 0 = came due this instant, 1 = a full period late, <0 = not due.
+  // Normalizing is the point: it ranks a 7-day chore 14 days late (2.0) above a
+  // 30-day chore 4 days late (0.13), which raw "days late" would get backwards.
+  function overdueRatio(c, now){
+    now = now || Date.now();
+    const meta = state.meta[c.id] || {};
+    const lastDone = meta.lastDoneTs || 0;
+    if(!lastDone) return NEVER_DONE_RATIO;
+
+    if(isCycleReset(c)){
+      const periodMs = Math.max(1, cycleLengthDays()) * MS_DAY;
+      const cs = currentCycleStartTs(now);
+      if(lastDone >= cs) return -1;           // already done this cycle
+      return (now - cs) / periodMs;
+    }
+
+    const periodMs = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS) * MS_DAY;
+    return (now - (lastDone + periodMs)) / periodMs;
+  }
+
+  // The reserved slice of the week: most-overdue-by-ratio first, until the
+  // budget is spent. Ratios are bucketed before ranking, so chores that are
+  // late by indistinguishable amounts shuffle instead of locking into the same
+  // order week after week. We keep scanning past something that doesn't fit, so
+  // a light late chore can still use the leftover budget.
+  function promiseTier(pool, cap, now){
+    const budget = cap * clampNum(PROMISE_RESERVE, 0, 1, 0.5);
+    if(!(budget > 0)) return [];
+
+    const bucketOf = r => Math.floor(r / Math.max(1e-6, PROMISE_BUCKET));
+    const ranked = pool
+      .map(c => ({ c, r: overdueRatio(c, now), jitter: Math.random() }))
+      .filter(x => x.r >= 0)
+      .sort((a, b) => (bucketOf(b.r) - bucketOf(a.r)) || (a.jitter - b.jitter));
+
+    const picked = [];
+    let total = 0;
+    for(const x of ranked){
+      const w = x.c.weight || 0;
+      if(total + w > budget + 1e-9) continue;
+      picked.push(x.c);
+      total += w;
+    }
+    return picked;
+  }
+
+  // Odds for the lottery half. `weight` stays the COST against the cap; this is
+  // only the probability of being drawn, so being overdue can raise a chore's
+  // chances without making it more expensive to fit.
+  function pickScore(t, now){
+    const base = t.weight || 1;
+    if(!(URGENCY_TILT > 0)) return base;
+    return base * (1 + URGENCY_TILT * Math.max(0, overdueRatio(t, now)));
+  }
+
+  // `seed` is the promise tier: already-decided items every candidate subset
+  // starts from. They are charged against the cap like anything else.
+  function drawToCapRandom(pool, cap, seed, now){
+    const picked=(seed||[]).slice();
+    const seedIds=new Set(picked.map(t=>t.id));
+    const remaining=pool.filter(t=>!seedIds.has(t.id));
+    let total=picked.reduce((s,t)=>s+(t.weight||0),0);
     let guard=1000;
     while(guard-- && remaining.length){
       const feasible=remaining.filter(t=> total+(t.weight||0) <= cap);
       if(!feasible.length) break;
-      const chosen=weightedPick(feasible);
+      const chosen=weightedPick(feasible, now);
       picked.push(chosen);
       total += (chosen.weight||0);
       const idx=remaining.findIndex(x=>x.id===chosen.id);
@@ -1261,10 +1372,11 @@
     return picked;
   }
 
-  function weightedPick(list){
-    const tot=list.reduce((s,t)=>s+(t.weight||1),0);
+  function weightedPick(list, now){
+    const tot=list.reduce((s,t)=>s+pickScore(t, now),0);
+    if(!(tot > 0)) return list[Math.floor(Math.random()*list.length)];
     let r=Math.random()*tot;
-    for(const it of list){ r -= (it.weight||1); if(r<=0) return it; }
+    for(const it of list){ r -= pickScore(it, now); if(r<=0) return it; }
     return list[list.length-1];
   }
 
@@ -2306,6 +2418,13 @@
   (function tests(){
     const assert=(name,cond)=>{(cond?console.log:console.warn)('[Test]',name,cond?'✓':'✗');};
 
+    // Several tests push fixture chores into `chores` and then call code paths
+    // that render; renderAll() -> normalizeData() persists `chores` to
+    // localStorage. Snapshot up front and roll back at the end so a fixture can
+    // never survive into real data. (This is what was leaking 'Tmp Stick'.)
+    const __savedChores = JSON.parse(JSON.stringify(chores));
+    const __savedState  = JSON.parse(JSON.stringify(state));
+
     // T1: completion persists and respects cadence
     (function(){
       const tmpId='__t_cadence';
@@ -2678,7 +2797,90 @@
       state.cycleStarts = savedStarts;
     })();
 
-    save(LS_STATE,state);
+    // T21: overdueRatio measures lateness against each chore's own cadence
+    (function(){
+      const savedMode=state.cycleMode, savedWeeks=state.weeksPerCycle, savedAuto=state.autoSizeWeeks;
+      state.cycleMode='rolling'; state.weeksPerCycle=4; state.autoSizeWeeks=false; // cycle-reset cutoff = 26d
+      const now = Date.now();
+      const quick = {id:'ztest-quick', name:'Quick', weight:0.5, cadenceDays:7,  tags:[], enabled:true};
+      const slow  = {id:'ztest-slow',  name:'Slow',  weight:2.5, cadenceDays:14, tags:[], enabled:true};
+      assert('T21 fixtures use the cadence branch', !isCycleReset(quick) && !isCycleReset(slow));
+      state.meta['ztest-quick'] = { lastDoneTs: now - 21*MS_DAY }; // 14d late on 7d  -> ~2.0
+      state.meta['ztest-slow']  = { lastDoneTs: now - 18*MS_DAY }; //  4d late on 14d -> ~0.29
+      assert('T21 a 7d chore 14d late scores ~2', Math.abs(overdueRatio(quick, now) - 2) < 0.05);
+      assert('T21 a 14d chore 4d late scores <0.5', overdueRatio(slow, now) < 0.5);
+      assert('T21 short cadence outranks long cadence', overdueRatio(quick, now) > overdueRatio(slow, now));
+      state.meta['ztest-quick'] = { lastDoneTs: now - 3*MS_DAY };
+      assert('T21 a chore inside its cadence is not due', overdueRatio(quick, now) < 0);
+      const cyc = {id:'ztest-cyc', name:'Cyc', weight:1, cadenceDays:30, tags:[], enabled:true};
+      assert('T21 a 30d chore is cycle-reset at 4 weeks', isCycleReset(cyc));
+      state.meta['ztest-cyc'] = { lastDoneTs: currentCycleStartTs(now) + 1000 };
+      assert('T21 cycle-reset chore done this cycle is not due', overdueRatio(cyc, now) === -1);
+      delete state.meta['ztest-quick']; delete state.meta['ztest-slow']; delete state.meta['ztest-cyc'];
+      state.cycleMode=savedMode; state.weeksPerCycle=savedWeeks; state.autoSizeWeeks=savedAuto;
+    })();
+
+    // T22: the promise tier puts the most-overdue chore in EVERY draw,
+    //      while the rest of the week still varies
+    (function(){
+      const savedMode=state.cycleMode, savedWeeks=state.weeksPerCycle, savedAuto=state.autoSizeWeeks;
+      state.cycleMode='rolling'; state.weeksPerCycle=4; state.autoSizeWeeks=false;
+      const now = Date.now();
+      const pool = [];
+      for(let i=1;i<=10;i++){
+        const id='ztest-p'+i;
+        pool.push({id, name:'P'+i, weight: i===1?0.5:2, cadenceDays: i===1?7:14, tags:[], enabled:true});
+        // Everyone is a little late; P1 is very late relative to its 7d cadence.
+        state.meta[id] = { lastDoneTs: now - (i===1 ? 28*MS_DAY : 18*MS_DAY) };
+      }
+      let hits=0, overCap=0; const keys=new Set();
+      for(let i=0;i<25;i++){
+        const s = pickWeeklySet(pool, 8, ['Adam','Hannah']);
+        if(s.some(x=>x.id==='ztest-p1')) hits++;
+        if(s.reduce((a,x)=>a+(x.weight||0),0) > 8 + 1e-9) overCap++;
+        keys.add(s.map(x=>x.id).sort().join('|'));
+      }
+      assert('T22 the most-overdue chore is in every draw', hits === 25);
+      assert('T22 the rest of the week still varies (>=3 distinct)', keys.size >= 3);
+      assert('T22 every draw respects the cap', overCap === 0);
+      for(let i=1;i<=10;i++) delete state.meta['ztest-p'+i];
+      state.cycleMode=savedMode; state.weeksPerCycle=savedWeeks; state.autoSizeWeeks=savedAuto;
+    })();
+
+    // T23: near-identical lateness shuffles instead of locking in
+    (function(){
+      const savedMode=state.cycleMode, savedWeeks=state.weeksPerCycle, savedAuto=state.autoSizeWeeks;
+      state.cycleMode='rolling'; state.weeksPerCycle=4; state.autoSizeWeeks=false;
+      const now = Date.now();
+      const pool = [];
+      for(let i=1;i<=8;i++){
+        const id='ztest-q'+i;
+        pool.push({id, name:'Q'+i, weight:1.5, cadenceDays:14, tags:[], enabled:true});
+        // All late by within a few minutes of each other: a strict sort would
+        // pin the same ones every week; bucketing must shuffle them.
+        state.meta[id] = { lastDoneTs: now - 14*MS_DAY - i*60000 };
+      }
+      const seenFirst = new Set();
+      for(let i=0;i<40;i++){
+        const tier = promiseTier(pool, 8, now);
+        if(tier.length) seenFirst.add(tier[0].id);
+      }
+      assert('T23 indistinguishable lateness rotates (>=4 different leaders)', seenFirst.size >= 4);
+      for(let i=1;i<=8;i++) delete state.meta['ztest-q'+i];
+      state.cycleMode=savedMode; state.weeksPerCycle=savedWeeks; state.autoSizeWeeks=savedAuto;
+    })();
+
+    // T24: PROMISE_RESERVE leaves room for the lottery
+    (function(){
+      assert('T24 reserve keeps at least some cap for the draw', PROMISE_RESERVE < 1);
+      assert('T24 reserve is a real share of the week', PROMISE_RESERVE > 0);
+    })();
+
+    // Roll back everything the tests touched, in memory AND on disk.
+    chores = __savedChores;
+    state  = __savedState;
+    save(LS_DATA, chores);
+    save(LS_STATE, state);
   })();
 
 })();
