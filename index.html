@@ -6,12 +6,12 @@
   <title>Weighted Weekly Chore Picker</title>
   <meta name="color-scheme" content="light dark" />
   <style>
-    :root{--bg:#0b0c10;--text:#111827;--muted:#6b7280;--card:#fff;--accent:#2563eb;--accent2:#10b981;--border:#e5e7eb;color-scheme:light dark}
+    :root{--bg:#f3f4f6;--text:#111827;--muted:#6b7280;--card:#fff;--accent:#2563eb;--accent2:#10b981;--border:#e5e7eb;color-scheme:light dark}
     @media (prefers-color-scheme:dark){:root{--bg:#0b0c10;--text:#f3f4f6;--muted:#9ca3af;--card:#111827;--accent:#60a5fa;--accent2:#34d399;--border:#1f2937}}
     *{box-sizing:border-box}
     body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
     .container{max-width:1100px;margin:0 auto;padding:24px}
-    header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap}
     h1{font-size:clamp(20px,4vw,28px);margin:0}
     .sub{color:var(--muted);font-size:14px}
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.05)}
@@ -22,6 +22,7 @@
     select{min-width:120px}
     input:disabled{opacity:.55}
     .btn{appearance:none;border:1px solid var(--border);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
     .btn.secondary{background:transparent;color:var(--text)}
     .btn.accent{background:var(--accent);color:#fff;border-color:transparent}
     .btn.success{background:var(--accent2);color:#06261b;border-color:transparent}
@@ -30,7 +31,7 @@
     .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--border);padding:4px 10px;border-radius:999px}
     .check{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;margin:0;white-space:nowrap}
     .check input{width:16px;height:16px;margin:0}
-    .section-title{display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px}
+    .section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 8px;flex-wrap:wrap}
     .progress{height:10px;width:100%;background:transparent;border:1px solid var(--border);border-radius:999px;overflow:hidden}
     .progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .3s ease}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
@@ -45,12 +46,14 @@
     .badge.snoozed{border-color:rgba(245,158,11,.55);color:#f59e0b}
     .owner-badge{font-size:12px;padding:4px 8px;border-radius:8px;background:rgba(16,185,129,.14);color:#10b981;font-weight:800}
     .owner-badge.muted-owner{background:rgba(107,114,128,.14);color:var(--muted)}
+    .is-hidden{display:none !important}
 
     .hint{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6}
     .hint b{color:var(--text)}
     .hint .warn{color:#f59e0b}
     .notice{display:none;margin-top:12px;font-size:13px;line-height:1.5;border:1px solid rgba(37,99,235,.45);background:rgba(37,99,235,.09);border-radius:12px;padding:10px 12px}
     .notice.show{display:block}
+    .leftover-note{font-size:12px;color:var(--muted);margin:-2px 0 8px;line-height:1.5}
 
     .table{width:100%;border-collapse:collapse}
     .table th,.table td{padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
@@ -58,9 +61,9 @@
     .table input[type=text]{min-width:180px}
 
     /* Draw overlay */
-    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:1000}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px}
     .overlay.show{display:flex}
-    .draw-modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;width:min(720px,94vw);box-shadow:0 30px 60px rgba(0,0,0,.25)}
+    .draw-modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;width:min(720px,94vw);max-height:90vh;overflow:auto;box-shadow:0 30px 60px rgba(0,0,0,.25)}
     .draw-item{position:relative;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 14px 28px rgba(0,0,0,.08);margin:8px 0}
     .roller{font-weight:800;letter-spacing:.2px;font-size:18px;line-height:1.35;opacity:.85;animation:pulse 1s ease-in-out infinite}
     .roller.final{animation:none}
@@ -69,6 +72,15 @@
     .confetti{position:absolute;width:8px;height:12px;border-radius:2px;top:8px;left:50%;transform:translateX(-50%);opacity:.95;animation:conf 1.6s ease-out forwards}
     @keyframes conf{0%{transform:translate(-50%,-10px) rotate(0deg);opacity:1}100%{transform:translate(calc(-50% + var(--dx,0px)),140px) rotate(300deg);opacity:0}}
     .owner-line{display:flex;align-items:center;gap:8px;margin-top:8px}
+    @media (prefers-reduced-motion:reduce){.roller{animation:none}.confetti{display:none}}
+
+    /* Last-week review (inside the draw overlay) */
+    .review-intro{font-size:13px;line-height:1.5;color:var(--muted);margin:0 0 8px}
+    .review-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin:8px 0;cursor:pointer;color:var(--text);font-size:14px}
+    .review-row:hover{background:rgba(127,127,127,.06)}
+    .review-row input{width:18px;height:18px;margin:0;flex:none}
+    .review-row .grow{flex:1;min-width:0}
+    .review-row .name{font-weight:700}
 
     /* Tabs */
     .tabs{display:flex;gap:4px;margin:0 0 16px;border-bottom:1px solid var(--border);overflow-x:auto}
@@ -93,6 +105,10 @@
     .history-item .item-owner{font-weight:800;font-size:12px;padding:2px 8px;border-radius:6px;background:rgba(16,185,129,.14);color:#10b981}
     .history-item .item-owner.no-owner{background:rgba(107,114,128,.14);color:var(--muted);font-weight:600}
     .history-item .item-weight{color:var(--muted);font-variant-numeric:tabular-nums}
+    .item-status{display:inline-block;margin-left:8px;font-size:11px;font-weight:700;padding:1px 6px;border-radius:6px;border:1px solid var(--border);color:var(--muted)}
+    .item-status.done{color:var(--accent2);border-color:rgba(16,185,129,.55)}
+    .item-status.missed{color:#ef4444;border-color:rgba(239,68,68,.55)}
+    .item-status.skipped{color:#f59e0b;border-color:rgba(245,158,11,.55)}
     .totals-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
     .totals-card{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--card)}
     .totals-card h4{margin:0 0 8px;font-size:14px}
@@ -103,6 +119,11 @@
     /* Modal action rows */
     .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
     .modal-actions.hidden{display:none}
+
+    @media (max-width:520px){
+      .container{padding:16px}
+      input[type=text]{min-width:0;width:100%}
+    }
   </style>
 </head>
 <body>
@@ -110,9 +131,10 @@
     <header>
       <div>
         <h1>Weighted Weekly Chore Picker</h1>
-        <div class="sub">Cadence-aware • Rolling cycles • Random draw with rotation • Sticky owner per cycle</div>
+        <div class="sub">Sunday–Saturday weeks • Cadence-aware • Weekly chores every week • Fair split with rotation</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+        <div class="pill" id="weekPill">Week of —</div>
         <div class="pill" id="cyclePill">Cycle: —</div>
       </div>
     </header>
@@ -151,7 +173,7 @@
           <input id="flexPct" type="number" step="5" min="0" max="90" value="25" style="min-width:110px" />
         </div>
         <div>
-          <label>People (comma separated)</label>
+          <label for="people">People (comma separated)</label>
           <input id="people" type="text" placeholder="Adam, Hannah" value="Adam, Hannah" />
         </div>
         <div>
@@ -164,7 +186,7 @@
 
       <div class="row" style="margin-top:12px">
         <button class="btn accent" id="drawBtn">Draw this week</button>
-        <button class="btn success" id="finishBtn" title="Assign all currently-due tasks (ignores cap)">Finish due</button>
+        <button class="btn success" id="finishBtn" title="Assign all currently-due tasks for this week (ignores cap)">Finish due</button>
         <button class="btn secondary" id="newCycleBtn" title="Close the current cycle and put per-cycle chores back in the pool">Start new cycle</button>
         <button class="btn secondary" id="undoBtn" title="Undo last assignment batch">Undo last</button>
         <button class="btn secondary" id="resetBtn" title="Clears this cycle's assignment history only (does not forget last done)">Clear cycle history</button>
@@ -179,20 +201,29 @@
       </div>
       <div class="progress"><span id="progressBar"></span></div>
 
+      <div id="leftoverWrap" class="is-hidden">
+        <div class="section-title" style="margin-top:16px">
+          <strong>Needs check-off</strong>
+          <span class="muted" id="leftoverMeta">—</span>
+        </div>
+        <div class="leftover-note">Drawn for an earlier week. Done counts for the week it was drawn for; Not done puts it back in the pool for this week.</div>
+        <div class="grid" id="leftovers"></div>
+      </div>
+
       <div class="section-title" style="margin-top:16px">
-        <strong>Outstanding</strong>
+        <strong>This week</strong>
         <span class="muted" id="outstandingMeta">—</span>
       </div>
       <div class="grid" id="outstanding"></div>
 
       <div class="section-title" style="margin-top:16px">
-        <strong>Completed</strong>
+        <strong>Completed this cycle</strong>
         <span class="muted" id="completedMeta">—</span>
       </div>
       <div class="grid" id="completed"></div>
 
       <div class="section-title" style="margin-top:16px">
-        <strong>Last assignment</strong>
+        <strong>Last draw</strong>
         <span class="muted" id="lastDrawMeta">—</span>
       </div>
       <div class="grid" id="lastDraw"></div>
@@ -232,7 +263,7 @@
               <th>Tags</th>
               <th style="width:180px">Last done</th>
               <th style="width:180px">Next due</th>
-              <th style="width:180px"></th>
+              <th style="width:200px"></th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -269,7 +300,8 @@
           <div>
             <label for="historyGroupBy">Group by</label>
             <select id="historyGroupBy">
-              <option value="cycle">Cycle (current mode)</option>
+              <option value="week">Week</option>
+              <option value="cycle">Cycle</option>
               <option value="month">Calendar month</option>
               <option value="none">None (chronological)</option>
             </select>
@@ -296,14 +328,25 @@
 
   </div>
 
-  <!-- Draw overlay -->
+  <!-- Draw overlay (also hosts the last-week check-off step) -->
   <div id="drawOverlay" class="overlay" aria-hidden="true">
     <div class="draw-modal" role="dialog" aria-modal="true" aria-labelledby="drawTitle">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <h2 id="drawTitle" class="task-title" style="margin:0;font-size:20px">Weekly Draw</h2>
         <div id="drawMeta" class="muted">—</div>
       </div>
+
+      <div id="reviewPanel" class="is-hidden">
+        <p class="review-intro" id="reviewIntro"></p>
+        <div id="reviewList"></div>
+      </div>
+
       <div id="drawList"></div>
+
+      <div class="modal-actions is-hidden" id="reviewActions">
+        <button class="btn danger" id="reviewCancel">Cancel</button>
+        <button class="btn success" id="reviewContinue">Save and draw</button>
+      </div>
       <div class="modal-actions" id="drawActionsAnimating">
         <button class="btn secondary" id="skipDraw">Skip animation</button>
       </div>
@@ -323,21 +366,25 @@
   const LS_STATE='choresDeck_v2_state';
   const LS_OLD_DATA='choresDeck_v1_data';
   const LS_OLD_STATE='choresDeck_v1_state';
+  const LS_SELFTEST='choresDeck_selftest';
+  const SCHEMA_VERSION=5;
   const WEEK_TOL=0.5; // weekly fairness tolerance (±0.5)
 
   // --------- Cadence-as-a-promise knobs ---------
   // Share of the weekly cap handed to the most-overdue chores before the
-  // lottery runs. 0 = pure lottery (the old behavior), 1 = pure triage.
+  // lottery runs. 0 = pure lottery, 1 = pure triage.
   const PROMISE_RESERVE = 0.5;
-  // How hard the lottery half leans toward overdue chores. 0 = flat (old behavior).
+  // How hard the lottery half leans toward overdue chores. 0 = flat.
   const URGENCY_TILT = 1.0;
-  // Ratios are bucketed before ranking, so chores that are late by
-  // indistinguishable amounts are treated as tied and shuffled instead of being
-  // ordered by fourth-decimal noise (which would lock the same chores in every
-  // week). 0.25 = quarter of a cadence period.
+  // Lateness is bucketed before ranking so chores that are late by the same
+  // amount are shuffled rather than locked into the same order every week.
   const PROMISE_BUCKET = 0.25;
   // A chore that has never been done is treated as this many periods late.
   const NEVER_DONE_RATIO = 1;
+  // Chores with a cadence this short or shorter are "weekly": whenever they're
+  // due they go into the week's draw first (they still count against the cap).
+  // Draws are weekly, so nothing can come around more often than once a week.
+  const WEEKLY_MAX_CADENCE = 7;
   // Ids the self-tests use as fixtures; never real chores.
   const TEST_ID_RE = /^(__t_|ztest-|zrot\d|zrec\d|zroll\d)/;
   const DEFAULT_CADENCE_DAYS=30;
@@ -356,19 +403,16 @@
   // UI isn't wired up until after the first render pass; until then, read
   // config from state instead of from the (not-yet-populated) inputs.
   let uiReady = false;
+  // Self-tests flip this off so nothing they do can reach localStorage.
+  let persistEnabled = true;
+  let autoAdvanceGuard = false;
+  let drawInProgress = false;
 
   // --------- Cycle math ---------
   // Cycle boundaries are RECORDED in state.cycleStarts (ascending list of ms
   // timestamps) instead of being recomputed from a fixed epoch every time.
-  // That's what makes an early cycle possible: we can append a boundary
-  // whenever the cycle is finished, and every past batch stays grouped under
-  // the boundary it actually happened in.
-
-  function startOfDayTs(ts){
-    const d = new Date(ts);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  }
+  // That's what makes an early cycle possible, and keeps every past batch
+  // grouped under the boundary it actually happened in.
 
   function firstSundayTs(year, monthIndex){
     const d = new Date(year, monthIndex, 1, 0, 0, 0, 0);
@@ -384,13 +428,21 @@
     return d.getTime();
   }
 
+  // Calendar-day arithmetic (daylight-saving safe, unlike adding raw ms).
+  function addDaysTs(ts, n){
+    const d = new Date(ts);
+    d.setDate(d.getDate() + n);
+    return d.getTime();
+  }
+
   // Rolling cycle start: align to N-week buckets anchored at ROLLING_EPOCH.
   function rollingCycleStartTs(nowTs, weeksPerCycle){
     const n = Math.max(1, Math.floor(weeksPerCycle||DEFAULT_WEEKS_PER_CYCLE));
     const currentSunday = sundayOfWeekTs(nowTs);
-    const weeksSinceEpoch = Math.floor((currentSunday - ROLLING_EPOCH) / MS_WEEK);
+    // Round, not floor: across daylight saving the gap is an hour short of whole weeks.
+    const weeksSinceEpoch = Math.round((currentSunday - ROLLING_EPOCH) / MS_WEEK);
     const cycleIdx = Math.floor(weeksSinceEpoch / n);
-    return ROLLING_EPOCH + cycleIdx * n * MS_WEEK;
+    return addDaysTs(ROLLING_EPOCH, cycleIdx * n * 7);
   }
 
   // Monthly-mode cycle start = first Sunday of current month if we've reached it,
@@ -405,7 +457,7 @@
     return firstSundayTs(prev.getFullYear(), prev.getMonth());
   }
 
-  // Used only to seed the first boundary (fresh install or v2 migration).
+  // Used only to seed the first boundary (fresh install or migration).
   function deterministicCycleStartTs(nowTs){
     return (getCycleMode() === 'rolling')
       ? rollingCycleStartTs(nowTs, getWeeksPerCycle())
@@ -414,20 +466,20 @@
 
   // Where the NEXT boundary would land if nobody advances early.
   function projectedNextStart(cs){
-    if (getCycleMode() === 'rolling') return cs + getWeeksPerCycle() * MS_WEEK;
+    if (getCycleMode() === 'rolling') return addDaysTs(cs, getWeeksPerCycle() * 7);
     const d = new Date(cs);
     const nm = new Date(d.getFullYear(), d.getMonth() + 1, 1);
     const n = firstSundayTs(nm.getFullYear(), nm.getMonth());
-    return (n > cs) ? n : cs + 28 * MS_DAY;
+    return (n > cs) ? n : addDaysTs(cs, 28);
   }
 
   // Used to bucket timestamps that predate our earliest recorded boundary.
   function projectedPrevStart(cs){
-    if (getCycleMode() === 'rolling') return cs - getWeeksPerCycle() * MS_WEEK;
+    if (getCycleMode() === 'rolling') return addDaysTs(cs, -getWeeksPerCycle() * 7);
     const d = new Date(cs);
     const pm = new Date(d.getFullYear(), d.getMonth(), 0); // last day of prev month
     const p = firstSundayTs(pm.getFullYear(), pm.getMonth());
-    return (p < cs) ? p : cs - 28 * MS_DAY;
+    return (p < cs) ? p : addDaysTs(cs, -28);
   }
 
   // Seed the boundary list if needed and roll it forward to cover nowTs.
@@ -462,6 +514,40 @@
     return changed;
   }
 
+  // Earlier versions ran their self-tests against live data on every page load,
+  // and those tests added extra cycle boundaries (at 2- and 4-week spacing) that
+  // stuck around and kept "resetting" the cycle. Scheduled boundaries can always
+  // be re-derived, so rebuild the list from the first boundary plus any early
+  // (auto/manual) starts, projecting the scheduled ones in between.
+  function repairCycleStarts(nowTs = Date.now()){
+    const raw = Array.isArray(state.cycleStarts) ? state.cycleStarts : [];
+    const arr = Array.from(new Set(raw.filter(t => typeof t === 'number' && isFinite(t))))
+      .sort((a, b) => a - b);
+    if(arr.length <= 1) return false;
+    const tags = state.cycleStartsMeta || {};
+    const early = arr.filter((t, i) => i > 0 && (tags[t] === 'auto' || tags[t] === 'manual'));
+    const out = [arr[0]];
+    let i = 0, guard = 3000;
+    while(guard--){
+      const last = out[out.length - 1];
+      const sched = projectedNextStart(last);
+      const e = early[i];
+      if(e !== undefined && (e <= sched || !(sched > last))){
+        if(e > last) out.push(e);
+        i++;
+        continue;
+      }
+      if(sched > last && sched <= nowTs){ out.push(sched); continue; }
+      if(e !== undefined){ if(e > last) out.push(e); i++; continue; }
+      break;
+    }
+    if(out.length === arr.length && out.every((t, k) => t === arr[k])) return false;
+    const removed = arr.filter(t => out.indexOf(t) === -1).length;
+    state.cycleStarts = out.slice(-300);
+    console.log('[Chores] rebuilt cycle boundaries; dropped ' + removed + ' stray one(s).');
+    return true;
+  }
+
   function currentCycleStartTs(nowTs = Date.now()){
     ensureCycleStarts(nowTs);
     return state.cycleStarts[state.cycleStarts.length - 1];
@@ -473,6 +559,15 @@
       if(arr[i] > cycleStartTs) return arr[i];
     }
     return projectedNextStart(cycleStartTs);
+  }
+
+  // First recorded boundary strictly after ts, or null.
+  function boundaryAfter(ts){
+    const arr = state.cycleStarts || [];
+    for(let i = 0; i < arr.length; i++){
+      if(arr[i] > ts) return arr[i];
+    }
+    return null;
   }
 
   // Which cycle does an arbitrary timestamp belong to? Recorded boundaries win;
@@ -509,11 +604,11 @@
   // Keep old name as an alias for any lingering references.
   const isMonthlyLike = isCycleReset;
 
-  // Drop outstanding assignments and sticky owners that belong to an older cycle.
+  // A cycle change only retires the previous cycle's sticky-owner bucket.
+  // Open assignments belong to the WEEK they were drawn for and stay put until
+  // someone checks them off, so a boundary passing on a Sunday no longer wipes
+  // last week's list before you've had a chance to mark it.
   function pruneForCycle(cs){
-    for (const [id, o] of Object.entries(state.open || {})){
-      if ((o && o.assignedTs ? o.assignedTs : 0) < cs) delete state.open[id];
-    }
     if (state.cycleAssignments){
       for (const k of Object.keys(state.cycleAssignments)){
         if (String(k) !== String(cs)) delete state.cycleAssignments[k];
@@ -533,8 +628,7 @@
   }
 
   // The most recent thing that happened, so an early boundary never lands
-  // before a completion we just recorded (which would leave it "done this
-  // cycle" and keep us stuck).
+  // before a completion we just recorded.
   function latestActivityTs(){
     let latest = 0;
     for(const m of Object.values(state.meta || {})){
@@ -564,7 +658,7 @@
     ensureCycleStarts(nowTs);
     const cur = currentCycleStartTs(nowTs);
     let boundary = candidateBoundary(nowTs);
-    if(boundary <= cur) boundary = nowTs + 1;
+    if(boundary <= cur) boundary = Math.max(nowTs + 1, cur + 1);
 
     state.cycleStarts.push(boundary);
     state.cycleStarts.sort((a, b) => a - b);
@@ -577,7 +671,7 @@
     return boundary;
   }
 
-  // Nothing outstanding and nothing due = this cycle is finished.
+  // Nothing open and nothing due = this cycle is finished.
   function cycleExhausted(nowTs = Date.now()){
     if(!chores.some(isEnabled)) return false;
     if(Object.keys(state.open || {}).length) return false;
@@ -586,7 +680,7 @@
   }
 
   // How many chores would come back into the pool if we started a cycle at
-  // candidateCs? Snoozed and cadence-gated chores are unaffected by a new
+  // candidateCs? Skipped and cadence-gated chores are unaffected by a new
   // cycle, so this is 0 when advancing wouldn't actually help.
   function wouldUnlockCount(candidateCs, nowTs = Date.now()){
     let n = 0;
@@ -598,7 +692,6 @@
     return n;
   }
 
-  let autoAdvanceGuard = false;
   function maybeAutoAdvance(nowTs = Date.now()){
     if(autoAdvanceGuard) return false;
     if(state.autoAdvance === false) return false;
@@ -610,6 +703,43 @@
     try { startNewCycle(nowTs, 'auto'); }
     finally { autoAdvanceGuard = false; }
     return true;
+  }
+
+  // --------- Week math ---------
+  // A week runs Sunday 00:00 → next Sunday 00:00, local time. Every draw, every
+  // assignment and every completion belongs to exactly one week, no matter
+  // which day you actually open the app.
+  function weekStartTs(ts){ return sundayOfWeekTs(ts); }
+  function weekEndTs(ws){ return addDaysTs(ws, 7); }
+  function weeksBetween(fromWs, toWs){ return Math.round((toWs - fromWs) / MS_WEEK); }
+  function fmtShortDate(ts){ return new Date(ts).toLocaleDateString([], {month:'short', day:'numeric'}); }
+  function weekRangeLabel(ws){ return fmtShortDate(ws) + ' – ' + fmtShortDate(addDaysTs(ws, 6)); }
+  function weekLabel(ws, nowTs){
+    const diff = weeksBetween(ws, weekStartTs(nowTs || Date.now()));
+    if(diff === 0) return 'This week';
+    if(diff === 1) return 'Last week';
+    if(diff === -1) return 'Next week';
+    return 'Week of ' + fmtShortDate(ws);
+  }
+  function weekPhrase(ws, nowTs){
+    const diff = weeksBetween(ws, weekStartTs(nowTs || Date.now()));
+    if(diff === 0) return 'this week';
+    if(diff === 1) return 'last week';
+    return 'the week of ' + fmtShortDate(ws);
+  }
+  // Completions are credited to the week the chore was drawn for. Checking off
+  // last week's chores on Tuesday still counts for last week.
+  function creditTsForWeek(ws, nowTs){
+    const end = weekEndTs(ws);
+    return (nowTs < end) ? nowTs : end - 1000;
+  }
+  function openWeekStart(o){
+    if(o && typeof o.weekStart === 'number' && isFinite(o.weekStart)) return o.weekStart;
+    return weekStartTs((o && o.assignedTs) || Date.now());
+  }
+  function batchWeekStart(b){
+    if(b && typeof b.weekStart === 'number' && isFinite(b.weekStart)) return b.weekStart;
+    return weekStartTs((b && b.ts) || 0);
   }
 
   // --------- Defaults ---------
@@ -641,6 +771,7 @@
 
   // State shape (persisted):
   // state = {
+  //   schemaVersion: number,
   //   cycleMode: 'rolling' | 'monthly',
   //   weeksPerCycle: number (rolling mode only, ignored when autoSizeWeeks),
   //   autoSizeWeeks: boolean,        // derive cycle length from workload
@@ -650,12 +781,14 @@
   //   cycleStartsMeta: { [ts]: 'auto' | 'manual' },
   //   cycleStartTs: number,          // active cycle start (last of cycleStarts)
   //   cycleAssignments: { [cycleStartTs]: { [taskId]: ownerName } },
-  //   months: { [YYYY-MM]: { history: [{ts,total,items:[{id,name,weight,owner}]}] } },
-  //   open: { [taskId]: {assignedTs, owner} },
+  //   months: { [YYYY-MM]: { history: [{ts, weekStart, total, finish,
+  //             items:[{id,name,weight,owner,status?,resolvedTs?}]}] } },
+  //   open: { [taskId]: {assignedTs, owner, weekStart} },
   //   meta: { [taskId]: { lastDoneTs, snoozeUntilTs } },
-  //   doneLog: [{ts,id,name,weight,owner}],
+  //   doneLog: [{ts, markedTs, id, name, weight, owner, weekStart, assignedTs, prevLastDoneTs}],
   //   cap, people
   // }
+  // Batch item status: 'done' | 'missed' | 'skipped' (absent = still open or legacy).
 
   // Migrate from v1 storage if present
   let chores=load(LS_DATA);
@@ -690,11 +823,15 @@
   const autoWeeksWrap=$('#autoWeeksWrap');
   const autoWeeksChk=$('#autoWeeks');
   const autoAdvanceChk=$('#autoAdvance');
+  const weekPill=$('#weekPill');
   const cyclePill=$('#cyclePill');
   const cycleStats=$('#cycleStats');
   const cycleNotice=$('#cycleNotice');
   const workloadHint=$('#workloadHint');
   const progressBar=$('#progressBar');
+  const leftoverWrap=$('#leftoverWrap');
+  const leftoverEl=$('#leftovers');
+  const leftoverMeta=$('#leftoverMeta');
   const outstandingEl=$('#outstanding');
   const outstandingMeta=$('#outstandingMeta');
   const completedEl=$('#completed');
@@ -715,7 +852,6 @@
   const historyGroupBy=$('#historyGroupBy');
 
   // Per-group collapsed state (survives re-renders within a session).
-  // Keyed by group id string; true means collapsed.
   const historyCollapsed = new Map();
 
   // wire
@@ -741,7 +877,6 @@
       document.querySelectorAll('.tab-panel').forEach(p=>{
         p.classList.toggle('active', p.id === 'tab-' + target);
       });
-      // Refresh the history view on entry so counts stay accurate
       if(target === 'history') renderHistory();
     });
   });
@@ -752,7 +887,6 @@
   historyGroupBy.addEventListener('change', ()=>{ historyCollapsed.clear(); renderHistory(); });
   $('#historyExpandAll').addEventListener('click', ()=>{ historyCollapsed.clear(); renderHistory(); });
   $('#historyCollapseAll').addEventListener('click', ()=>{
-    // Mark every currently-shown group as collapsed
     for(const el of document.querySelectorAll('.history-cycle')){
       const k = el.dataset.groupKey;
       if(k) historyCollapsed.set(k, true);
@@ -795,17 +929,17 @@
   });
 
   // One-time hygiene at boot: drop self-test fixtures that leaked into saved
-  // data in earlier versions. This runs once per load and BEFORE the first
-  // render, so it never fights the test suite's own fixtures further down.
+  // data in earlier versions.
   (function purgeLeakedTestRows(){
     const before = chores.length;
     chores = chores.filter(c => !TEST_ID_RE.test(String((c && c.id) || '')));
-    if(chores.length !== before){
-      for(const k of Object.keys(state.meta || {})) if(TEST_ID_RE.test(k)) delete state.meta[k];
-      for(const k of Object.keys(state.open || {})) if(TEST_ID_RE.test(k)) delete state.open[k];
+    let touched = chores.length !== before;
+    for(const k of Object.keys(state.meta || {})) if(TEST_ID_RE.test(k)){ delete state.meta[k]; touched = true; }
+    for(const k of Object.keys(state.open || {})) if(TEST_ID_RE.test(k)){ delete state.open[k]; touched = true; }
+    if(touched){
       save(LS_DATA, chores);
       save(LS_STATE, state);
-      console.log('[Chores] removed ' + (before - chores.length) + ' leaked self-test row(s) from saved data.');
+      console.log('[Chores] removed leaked self-test rows from saved data.');
     }
   })();
 
@@ -814,14 +948,15 @@
   renderAll();
 
   // --------------------
-  // Behavior clarifier:
-  // A task is eligible ("due") if:
-  // - enabled
-  // - not currently outstanding (open)
-  // - not snoozed
-  // - lastDone is missing OR (cycle-reset && lastDone < cycleStart) OR ((now - lastDone) >= cadenceDays)
-  // Cycle-reset chores reset on the cycle boundary. A cycle boundary arrives
-  // either on schedule OR early, as soon as there's nothing left to do.
+  // How a week works:
+  // - A draw belongs to the week (Sun–Sat) it's made in, even if you pull it on
+  //   a Tuesday. Its assignments stay "this week" until Saturday night.
+  // - After that they show under "Needs check-off". Done credits the week they
+  //   were drawn for; Not done puts them back in the pool. The next draw asks
+  //   about any still unchecked before it rolls.
+  // - A chore is due in the week its due date falls in, so a 7-day chore done
+  //   any day last week is due this week, whatever time you open the app.
+  // - Weekly chores (cadence ≤ 7 days) go into every draw they're due for.
   // --------------------
 
   function onCycleModeChange(){
@@ -859,17 +994,35 @@
   }
 
   function normalizeData(){
-    if(!state.months) state.months = {};
-    if(!state.open) state.open = {};
-    if(!state.meta) state.meta = {};
-    if(!state.doneLog) state.doneLog = [];
+    if(!state.months || typeof state.months !== 'object') state.months = {};
+    if(!state.open || typeof state.open !== 'object') state.open = {};
+    if(!state.meta || typeof state.meta !== 'object') state.meta = {};
+    if(!Array.isArray(state.doneLog)) state.doneLog = [];
     if(!state.cycleAssignments) state.cycleAssignments = {};
     if(!Array.isArray(state.cycleStarts)) state.cycleStarts = [];
     if(!state.cycleStartsMeta) state.cycleStartsMeta = {};
+
+    if((state.schemaVersion || 0) < SCHEMA_VERSION){
+      repairCycleStarts();
+      state.schemaVersion = SCHEMA_VERSION;
+    }
+
     const m=monthKey();
     if(!state.months[m]) state.months[m] = { history: [] };
 
     maybeRolloverCycle();
+
+    // Stamp every open assignment and every batch with the week it belongs to.
+    for(const [id, o] of Object.entries(state.open)){
+      if(!o || typeof o !== 'object'){ delete state.open[id]; continue; }
+      if(!(typeof o.weekStart === 'number' && isFinite(o.weekStart))) o.weekStart = weekStartTs(o.assignedTs || Date.now());
+    }
+    for(const mm of Object.values(state.months)){
+      const hist = (mm && Array.isArray(mm.history)) ? mm.history : [];
+      for(const h of hist){
+        if(h && !(typeof h.weekStart === 'number' && isFinite(h.weekStart))) h.weekStart = weekStartTs(h.ts || 0);
+      }
+    }
 
     // Normalize chores
     chores = chores.map(c=>{
@@ -882,8 +1035,7 @@
       return { id, name, weight, cadenceDays, tags, enabled };
     });
 
-    // Collapse duplicate ids. Duplicates share a single state key, so they can
-    // never be assigned, completed or snoozed independently anyway.
+    // Collapse duplicate ids (they share one state key anyway).
     const seenChoreIds = new Set();
     chores = chores.filter(c => {
       if(seenChoreIds.has(c.id)) return false;
@@ -893,7 +1045,6 @@
 
     // Drop open/meta/assignments for missing ids
     const ids = new Set(chores.map(c=>c.id));
-    if(!Array.isArray(state.doneLog)) state.doneLog = [];
     const cutoff = Date.now() - 366*86400000;
     state.doneLog = state.doneLog
       .filter(ev=>ev && ids.has(ev.id) && typeof ev.ts==='number' && ev.ts>=cutoff)
@@ -919,7 +1070,6 @@
   }
 
   function getOwnerForTask(taskId){
-    // Prefer live outstanding owner; otherwise fall back to this cycle's sticky assignment.
     if(state.open[taskId] && state.open[taskId].owner) return state.open[taskId].owner;
     const bucket = (state.cycleAssignments && state.cycleAssignments[currentCycleStartTs()]) || {};
     return bucket[taskId] || '';
@@ -929,6 +1079,147 @@
     if(!owner) return;
     const bucket = getCurrentCycleBucket();
     bucket[taskId] = owner;
+  }
+
+  // --------- Batches ---------
+  function findBatch(batchTs){
+    for(const mm of Object.values(state.months || {})){
+      for(const h of ((mm && mm.history) || [])){
+        if(h && h.ts === batchTs) return h;
+      }
+    }
+    return null;
+  }
+
+  function setBatchItemStatus(batchTs, taskId, status, ts){
+    const b = findBatch(batchTs);
+    if(!b) return;
+    for(const it of (b.items || [])){
+      if(it.id !== taskId) continue;
+      if(status){ it.status = status; it.resolvedTs = ts; }
+      else { delete it.status; delete it.resolvedTs; }
+    }
+  }
+
+  function itemStatus(b, it){
+    if(it.status) return it.status;
+    const o = state.open[it.id];
+    if(o && o.assignedTs === b.ts) return 'open';
+    const ld = (state.meta[it.id] && state.meta[it.id].lastDoneTs) || 0;
+    if(ld >= b.ts) return 'done';
+    return 'cleared';
+  }
+
+  function statusLabel(st){
+    return ({done:'done', missed:'not done', skipped:'skipped', open:'open', cleared:'cleared'})[st] || st;
+  }
+
+  // Total weight drawn for a given week (all draws that week, whatever happened to them).
+  function weekAssignedWeight(ws){
+    let total = 0;
+    for(const mm of Object.values(state.months || {})){
+      for(const h of ((mm && mm.history) || [])){
+        if(h && batchWeekStart(h) === ws) total += (h.total || 0);
+      }
+    }
+    return total;
+  }
+
+  // Open assignments drawn for a week before this one.
+  function getLeftovers(nowTs){
+    const cur = weekStartTs(nowTs || Date.now());
+    return Object.entries(state.open || {})
+      .map(([id, o]) => ({ id, o, t: getTaskById(id), ws: openWeekStart(o) }))
+      .filter(x => x.t && x.ws < cur)
+      .sort((a, b) => (a.ws - b.ws) || a.t.name.localeCompare(b.t.name));
+  }
+
+  // --------- Overlay ---------
+  function openOverlay(){
+    const overlay = document.getElementById('drawOverlay');
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden','false');
+    document.getElementById('drawBtn').disabled = true;
+    document.getElementById('finishBtn').disabled = true;
+  }
+
+  function closeOverlay(){
+    const overlay = document.getElementById('drawOverlay');
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden','true');
+    document.getElementById('drawBtn').disabled = false;
+    document.getElementById('finishBtn').disabled = false;
+  }
+
+  function setOverlayMode(mode){
+    const review = (mode === 'review');
+    document.getElementById('reviewPanel').classList.toggle('is-hidden', !review);
+    document.getElementById('reviewActions').classList.toggle('is-hidden', !review);
+    document.getElementById('drawList').classList.toggle('is-hidden', review);
+    document.getElementById('drawActionsAnimating').classList.toggle('is-hidden', review);
+    document.getElementById('drawActionsDecide').classList.add('hidden');
+  }
+
+  // Before a new draw: settle anything still open from an earlier week.
+  // Resolves true to carry on, false if cancelled.
+  function reviewLeftovers(continueLabel){
+    return new Promise(resolve => {
+      const now = Date.now();
+      const items = getLeftovers(now);
+      if(!items.length){ resolve(true); return; }
+
+      openOverlay();
+      setOverlayMode('review');
+      const weeks = Array.from(new Set(items.map(x => x.ws))).sort((a, b) => a - b);
+      document.getElementById('drawTitle').textContent = 'Check off ' + weekPhrase(weeks[weeks.length - 1], now) + ' first';
+      document.getElementById('drawMeta').textContent = items.length + ' still open';
+      document.getElementById('reviewIntro').textContent =
+        'These were drawn for an earlier week. Tick what got done and it counts for the week it was drawn for. '
+        + 'Anything left unticked goes back in the pool for this week\'s draw.';
+
+      const list = document.getElementById('reviewList');
+      list.innerHTML = '';
+      const boxes = [];
+      for(const x of items){
+        const row = document.createElement('label');
+        row.className = 'review-row';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.id = x.id;
+        boxes.push(cb);
+        const body = document.createElement('div');
+        body.className = 'grow';
+        body.innerHTML = '<div class="name">' + escapeHtml(x.t.name) + '</div>'
+          + '<div class="muted">' + escapeHtml(weekLabel(x.ws, now) + ' (' + weekRangeLabel(x.ws) + ')')
+          + ' • ' + (x.t.weight || 0).toFixed(1) + ' wt</div>';
+        row.appendChild(cb);
+        row.appendChild(body);
+        if(x.o.owner){
+          const ob = document.createElement('span');
+          ob.className = 'owner-badge';
+          ob.textContent = x.o.owner;
+          row.appendChild(ob);
+        }
+        list.appendChild(row);
+      }
+
+      const cancelBtn = document.getElementById('reviewCancel');
+      const contBtn = document.getElementById('reviewContinue');
+      contBtn.textContent = continueLabel || 'Save and continue';
+      const detach = () => { cancelBtn.onclick = null; contBtn.onclick = null; };
+      cancelBtn.onclick = () => { detach(); closeOverlay(); resolve(false); };
+      contBtn.onclick = () => {
+        detach();
+        const ts = Date.now();
+        for(const cb of boxes){
+          if(cb.checked) recordCompletion(cb.dataset.id, ts);
+          else releaseOpen(cb.dataset.id, ts, 'missed');
+        }
+        save(LS_STATE, state);
+        renderAll();
+        resolve(true);
+      };
+    });
   }
 
   // --------- Draw / Assign ---------
@@ -961,48 +1252,79 @@
 
     const soonest = soonestDueTs();
     alert('No due tasks right now.'
-      + (soonest ? '\n\nNext one comes due ' + new Date(soonest).toLocaleDateString() + ' (' + fmtIn(soonest) + ').' : '')
-      + '\n\nA new cycle would not unlock anything — the remaining chores are waiting on their cadence or a snooze.');
+      + (soonest ? '\n\nThe next one comes due ' + fmtDue(soonest) + '.' : '')
+      + '\n\nA new cycle would not unlock anything — the remaining chores are waiting on their cadence or a skip.');
     return [];
   }
 
   async function onDrawWeek(){
-    const cap=getCap();
-    const people=readPeople();
-    const pool=ensureDrawablePool();
-    if(pool.length===0) return;
+    if(drawInProgress) return;
+    drawInProgress = true;
+    try{
+      const proceed = await reviewLeftovers('Save and draw');
+      closeOverlay();
+      if(!proceed) return;
 
-    // Loop until the user confirms or cancels; each iteration is a fresh draw.
-    // Nothing is persisted until 'confirm'.
-    let rerollCount = 0;
-    while(true){
-      const picked = pickWeeklySet(pool, cap, people);
-      const assigned = fairAssign(picked, people);
-      const action = await animateDraw(assigned, { rerollCount });
-      if(action === 'confirm'){
-        assignBatch(assigned, false);
-        return;
+      const people = readPeople();
+      const pool = ensureDrawablePool();
+      if(!pool.length) return;
+
+      // The cap is per week, so a second draw in the same week gets what's left.
+      const fullCap = getCap();
+      const ws = weekStartTs(Date.now());
+      const used = weekAssignedWeight(ws);
+      let cap = fullCap - used;
+      const lightest = Math.min.apply(null, pool.map(t => t.weight || 0));
+      if(used > 0 && cap + 1e-9 < lightest){
+        const msg = 'You\'ve already drawn ' + used.toFixed(1) + ' wt for this week (cap ' + fullCap + ').\n\n'
+          + 'Draw another full week\'s worth anyway?';
+        if(!confirm(msg)) return;
+        cap = fullCap;
       }
-      if(action === 'cancel') return;
-      // action === 'reroll' -> loop
-      rerollCount++;
+      const capNote = (cap < fullCap - 1e-9)
+        ? cap.toFixed(1) + ' of ' + fullCap + ' wt left this week'
+        : 'cap ' + fullCap;
+
+      // Loop until the user confirms or cancels; nothing persists until 'confirm'.
+      let rerollCount = 0;
+      while(true){
+        const picked = pickWeeklySet(pool, cap, people);
+        const assigned = fairAssign(picked, people);
+        const action = await animateDraw(assigned, { rerollCount, capNote, weekStart: ws });
+        if(action === 'confirm'){
+          assignBatch(assigned, false);
+          return;
+        }
+        if(action === 'cancel') return;
+        rerollCount++;
+      }
+    } finally {
+      drawInProgress = false;
     }
   }
 
-  function onFinishDue(){
-    const pool = ensureDrawablePool();
-    if(!pool.length) return;
-    assignBatch(fairAssign(pool, readPeople()), true);
+  async function onFinishDue(){
+    if(drawInProgress) return;
+    drawInProgress = true;
+    try{
+      const proceed = await reviewLeftovers('Save and assign');
+      closeOverlay();
+      if(!proceed) return;
+      const pool = ensureDrawablePool();
+      if(!pool.length) return;
+      assignBatch(fairAssign(pool, readPeople()), true);
+    } finally {
+      drawInProgress = false;
+    }
   }
 
   function onStartNewCycle(){
     const now = Date.now();
     const candidate = candidateBoundary(now);
     const unlock = wouldUnlockCount(candidate, now);
-    const openCount = Object.keys(state.open || {}).length;
     const msg = 'Start a new cycle now?\n\n'
       + '• ' + unlock + ' chore' + (unlock===1?'':'s') + ' will be back in the pool\n'
-      + '• ' + openCount + ' outstanding assignment' + (openCount===1?'':'s') + ' from this cycle will be cleared\n'
+      + '• Open assignments stay with the week they were drawn for\n'
       + '• Last-done dates and history are kept';
     if(!confirm(msg)) return;
     startNewCycle(now, 'manual');
@@ -1015,12 +1337,18 @@
     if(!state.months[m]) state.months[m] = { history: [] };
 
     const now=Date.now();
+    const ws=weekStartTs(now);
     const total=items.reduce((s,t)=>s+(t.weight||0),0);
-    state.months[m].history.push({ ts: now, items: items.map(x=>({id:x.id,name:x.name,weight:x.weight,owner:x.owner})), total, finish: !!isFinish });
+    state.months[m].history.push({
+      ts: now,
+      weekStart: ws,
+      items: items.map(x=>({id:x.id,name:x.name,weight:x.weight,owner:x.owner})),
+      total,
+      finish: !!isFinish
+    });
 
-    // mark as outstanding + record sticky owner for this cycle
     for(const it of items){
-      state.open[it.id] = { assignedTs: now, owner: it.owner || '' };
+      state.open[it.id] = { assignedTs: now, owner: it.owner || '', weekStart: ws };
       if(it.owner) recordCycleOwner(it.id, it.owner);
     }
 
@@ -1031,7 +1359,6 @@
   }
 
   function undoLastBatch(){
-    // Find the most recent batch across any month bucket
     let latest = null, latestMonth = null, latestIdx = -1;
     for(const [m, mm] of Object.entries(state.months||{})){
       const hist = (mm && mm.history) || [];
@@ -1045,13 +1372,12 @@
 
     state.months[latestMonth].history.splice(latestIdx, 1);
 
-    // Remove open flags only for items from that batch IF they were not completed in the meantime
+    // Remove open flags only for items from that batch that are still open.
     const bucket = getCurrentCycleBucket();
     for(const it of (latest.items||[])){
       if(state.open[it.id] && state.open[it.id].assignedTs === latest.ts){
         delete state.open[it.id];
       }
-      // If no other batch in the current cycle assigned this task, clear the sticky owner too.
       if(bucket[it.id]){
         const stillAssignedInCycle = anyBatchAssignsTaskInCycle(it.id);
         if(!stillAssignedInCycle) delete bucket[it.id];
@@ -1074,55 +1400,122 @@
   }
 
   function clearCycleHistory(){
-    if(!confirm("Clear this cycle's assignment history? (Last done dates and outstanding tasks remain.)")) return;
+    if(!confirm("Clear this cycle's assignment history? (Last done dates and open assignments remain.)")) return;
     const cs = currentCycleStartTs();
     for(const m of Object.keys(state.months||{})){
       if(state.months[m] && Array.isArray(state.months[m].history)){
         state.months[m].history = state.months[m].history.filter(h => (h.ts||0) < cs);
       }
     }
-    // Also reset sticky owners for the current cycle
     if(state.cycleAssignments) state.cycleAssignments[cs] = {};
     save(LS_STATE,state);
     renderAll();
   }
 
-  // --------- Completion / Snooze ---------
-  function markDone(taskId){
-    const now=Date.now();
-    const t=getTaskById(taskId);
-    if(!t) return;
+  // --------- Completion / Skip ---------
+  // Records a completion without saving or rendering. If the chore is open,
+  // the completion is credited to the week it was drawn for.
+  function recordCompletion(taskId, nowTs){
+    const t = getTaskById(taskId);
+    if(!t) return false;
+    const o = state.open[taskId] || null;
+    const ws = o ? openWeekStart(o) : weekStartTs(nowTs);
+    const credit = creditTsForWeek(ws, nowTs);
+    const owner = (o && o.owner) ? o.owner : getOwnerForTask(taskId);
+
+    if(!state.meta[taskId]) state.meta[taskId] = {};
+    const m = state.meta[taskId];
+    const prev = m.lastDoneTs || 0;
 
     if(!Array.isArray(state.doneLog)) state.doneLog = [];
-    // owner comes from outstanding, else from sticky cycle assignment
-    const owner = (state.open[taskId] && state.open[taskId].owner)
-      ? state.open[taskId].owner
-      : getOwnerForTask(taskId);
-    state.doneLog.push({ ts: now, id: taskId, name: t.name, weight: t.weight, owner });
-    if(state.doneLog.length>500) state.doneLog = state.doneLog.slice(-500);
+    state.doneLog.push({
+      ts: credit, markedTs: nowTs, id: taskId, name: t.name, weight: t.weight, owner,
+      weekStart: ws, assignedTs: o ? o.assignedTs : null, prevLastDoneTs: prev || null
+    });
+    if(state.doneLog.length > 500) state.doneLog = state.doneLog.slice(-500);
 
-    if(!state.meta[taskId]) state.meta[taskId] = {};
-    state.meta[taskId].lastDoneTs = now;
-    delete state.meta[taskId].snoozeUntilTs;
-    delete state.open[taskId];
-    save(LS_STATE,state);
-    renderAll();
+    m.lastDoneTs = Math.max(prev, credit);
+    delete m.snoozeUntilTs;
+    if(o){
+      delete state.open[taskId];
+      setBatchItemStatus(o.assignedTs, taskId, 'done', nowTs);
+    }
+    return true;
   }
 
+  // Closes an open assignment without completing it. The chore goes back in
+  // the pool (if it's due) and the week's record says what happened.
+  function releaseOpen(taskId, nowTs, status){
+    const o = state.open[taskId];
+    if(!o) return false;
+    delete state.open[taskId];
+    setBatchItemStatus(o.assignedTs, taskId, status || 'missed', nowTs);
+    return true;
+  }
+
+  function markDone(taskId){
+    if(recordCompletion(taskId, Date.now())){
+      save(LS_STATE,state);
+      renderAll();
+    }
+  }
+
+  function markMissed(taskId){
+    if(releaseOpen(taskId, Date.now(), 'missed')){
+      save(LS_STATE,state);
+      renderAll();
+    }
+  }
+
+  // Undo the most recent completion of a chore: restore the previous last-done
+  // date and, if it came from an assignment, put that assignment back.
   function markNotDone(taskId){
     if(!state.meta[taskId]) state.meta[taskId] = {};
-    delete state.meta[taskId].lastDoneTs;
-    delete state.meta[taskId].snoozeUntilTs;
+    const m = state.meta[taskId];
+    const log = Array.isArray(state.doneLog) ? state.doneLog : [];
+    let idx = -1, best = -Infinity;
+    for(let i = log.length - 1; i >= 0; i--){
+      const ev = log[i];
+      if(ev && ev.id === taskId && ev.ts > best){ best = ev.ts; idx = i; }
+    }
+    if(idx === -1){
+      delete m.lastDoneTs;
+      delete m.snoozeUntilTs;
+      save(LS_STATE,state);
+      renderAll();
+      return;
+    }
+
+    const ev = log.splice(idx, 1)[0];
+    if(Object.prototype.hasOwnProperty.call(ev, 'prevLastDoneTs')){
+      if(ev.prevLastDoneTs) m.lastDoneTs = ev.prevLastDoneTs;
+      else delete m.lastDoneTs;
+    } else {
+      let prior = 0;
+      for(const e of log) if(e && e.id === taskId && e.ts > prior) prior = e.ts;
+      if(prior) m.lastDoneTs = prior; else delete m.lastDoneTs;
+    }
+    delete m.snoozeUntilTs;
+
+    if(ev.assignedTs && findBatch(ev.assignedTs) && !state.open[taskId]){
+      state.open[taskId] = {
+        assignedTs: ev.assignedTs,
+        owner: ev.owner || '',
+        weekStart: (typeof ev.weekStart === 'number') ? ev.weekStart : weekStartTs(ev.assignedTs)
+      };
+      setBatchItemStatus(ev.assignedTs, taskId, null);
+    }
     save(LS_STATE,state);
     renderAll();
   }
 
-  function snooze(taskId, days){
+  // Skips are week-aligned: "skip a week" brings the chore back next Sunday.
+  function snooze(taskId, weeks){
     const now=Date.now();
-    const d = clampNum(days, 1, 365, 7);
+    const w = clampNum(weeks, 1, 52, 1);
     if(!state.meta[taskId]) state.meta[taskId] = {};
-    state.meta[taskId].snoozeUntilTs = now + d*86400000;
-    delete state.open[taskId];
+    state.meta[taskId].snoozeUntilTs = addDaysTs(weekStartTs(now), 7*w);
+    if(state.open[taskId]) releaseOpen(taskId, now, 'skipped');
     save(LS_STATE,state);
     renderAll();
   }
@@ -1135,12 +1528,32 @@
 
   function isEnabled(c){ return c.enabled !== false; }
 
+  function isWeeklyChore(c){
+    return clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS) <= WEEKLY_MAX_CADENCE;
+  }
+
+  // Draws happen once a week, so a cadence shorter than a week acts as weekly.
+  function effectiveCadenceDays(c){
+    return Math.max(WEEKLY_MAX_CADENCE, clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS));
+  }
+
+  function isSnoozedAt(meta, nowTs){
+    const s = (meta && meta.snoozeUntilTs) || 0;
+    return !!s && weekStartTs(nowTs) < weekStartTs(s);
+  }
+
+  // The week a cadence chore comes due: the week its due date falls in. Using
+  // whole weeks is what makes a 7-day chore show up every Sunday, even if it
+  // was checked off later in the day than you pull the next draw.
+  function cadenceDueWeekTs(c, lastDone){
+    return weekStartTs(addDaysTs(lastDone, effectiveCadenceDays(c)));
+  }
+
   // csOverride lets us ask "would this be due if the cycle started at X?"
   // without touching any state.
   function isDueNow(c, now, csOverride){
     const meta = state.meta[c.id] || {};
-    const snoozeUntil = meta.snoozeUntilTs || 0;
-    if(snoozeUntil && now < snoozeUntil) return false;
+    if(isSnoozedAt(meta, now)) return false;
 
     const lastDone = meta.lastDoneTs || 0;
     if(!lastDone) return true;
@@ -1150,28 +1563,26 @@
       return lastDone < cycleStart;
     }
 
-    const cadenceDays = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
-    return (now - lastDone) >= cadenceDays*MS_DAY;
+    return cadenceDueWeekTs(c, lastDone) <= weekStartTs(now);
   }
 
   function nextDueTs(c){
+    const now = Date.now();
     const meta = state.meta[c.id] || {};
     const lastDone = meta.lastDoneTs || 0;
-    const snoozeUntil = meta.snoozeUntilTs || 0;
-    const now = Date.now();
 
     let due;
     if(!lastDone){
       due = now;
     } else if(isCycleReset(c)){
-      const cycleStart = currentCycleStartTs(now);
-      due = (lastDone < cycleStart) ? now : nextCycleStartTs(cycleStart);
+      const cs = currentCycleStartTs(now);
+      due = (lastDone < cs) ? now : nextCycleStartTs(cs);
     } else {
-      const cadenceDays = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
-      due = lastDone + cadenceDays*MS_DAY;
+      const dw = cadenceDueWeekTs(c, lastDone);
+      due = (dw <= weekStartTs(now)) ? now : dw;
     }
-
-    return Math.max(due, snoozeUntil);
+    if(isSnoozedAt(meta, now)) due = Math.max(due, weekStartTs(meta.snoozeUntilTs));
+    return due;
   }
 
   function soonestDueTs(){
@@ -1191,8 +1602,7 @@
   }
 
   // Weekly weight we can realistically expect to get through: the cap minus
-  // flex room, so a light week (Hannah dropping the cap by 2, a trip, whatever)
-  // doesn't blow up the plan.
+  // flex room, so a light week doesn't blow up the plan.
   function effectivePace(){
     return Math.max(0.1, getCap() * (1 - getFlexPct()));
   }
@@ -1214,44 +1624,67 @@
     let d = 0;
     for(const c of chores){
       if(!isEnabled(c)) continue;
-      const period = isCycleReset(c) ? cycleDays : clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS);
+      const period = isCycleReset(c) ? cycleDays : effectiveCadenceDays(c);
       d += (c.weight || 0) * 7 / Math.max(1, period);
     }
     return d;
   }
 
+  // --------- Urgency: cadence as a promise ---------
+  // How many cadence periods late a chore is, counted in whole weeks and
+  // normalized by its OWN cadence. 0 = due this week, 1 = a full period late,
+  // <0 = not due yet. A weekly chore one week late (1.0) outranks a 14-day
+  // chore one week late (0.5).
+  function overdueRatio(c, now){
+    now = now || Date.now();
+    const meta = state.meta[c.id] || {};
+    const lastDone = meta.lastDoneTs || 0;
+    if(!lastDone) return NEVER_DONE_RATIO;
+    const cur = weekStartTs(now);
+
+    if(isCycleReset(c)){
+      const cs = currentCycleStartTs(now);
+      if(lastDone >= cs) return -1;           // already done this cycle
+      const b = boundaryAfter(lastDone) || cs;
+      const weeksLate = Math.max(0, weeksBetween(weekStartTs(b), cur));
+      return weeksLate * 7 / Math.max(1, cycleLengthDays());
+    }
+
+    const weeksLate = weeksBetween(cadenceDueWeekTs(c, lastDone), cur);
+    return weeksLate * 7 / effectiveCadenceDays(c);
+  }
+
   // --------- Selection & Fairness ---------
-  // Picks a subset of the pool that (a) fits under the weekly cap and
-  // (b) — when there are 2 people — can be split fairly between them.
+  // Three layers, so cadence is a promise and the draw still feels like a draw:
   //
-  // Two tiers, so cadence is a promise and the draw still feels like a draw:
+  //   1. Weekly chores that are due go in first. They come around every week,
+  //      so leaving one out is a guaranteed miss.
+  //   2. A reserved slice of the cap (PROMISE_RESERVE) goes to whatever is
+  //      furthest past due relative to its own cadence.
+  //   3. The rest of the cap is a weighted lottery, tilted toward overdue chores.
   //
-  //   1. The promise tier takes a reserved slice of the cap (PROMISE_RESERVE)
-  //      and hands it to whatever is furthest past due *relative to its own
-  //      cadence*. That ordering is the whole fix: a 7-day chore two weeks late
-  //      outranks a 30-day chore four days late, so short-cadence chores stop
-  //      losing a lottery they were never weighted to win.
-  //   2. The rest of the cap is the old weighted lottery, lightly tilted toward
-  //      overdue chores.
-  //
-  // The promise tier is computed ONCE per draw, so every candidate subset
-  // contains it and the fairness split still reasons about the whole week.
+  // Layers 1 and 2 are computed ONCE per draw, so every candidate subset
+  // contains them and the fairness split reasons about the whole week.
   function pickWeeklySet(pool, cap, people){
     if(pool.length === 0) return [];
     const now = Date.now();
     const wantsSplit = people.length === 2;
-    const promised = promiseTier(pool, cap, now);
+    const ratios = new Map(pool.map(c => [c.id, overdueRatio(c, now)]));
 
-    // Aim for enough samples to see meaningful diversity. Bounded so this
-    // stays snappy even for larger pools.
+    const standing = standingTier(pool, cap, ratios);
+    const standingW = standing.reduce((s, t) => s + (t.weight || 0), 0);
+    const standingIds = new Set(standing.map(t => t.id));
+    const rest = pool.filter(t => !standingIds.has(t.id));
+    const budget = cap * clampNum(PROMISE_RESERVE, 0, 1, 0.5) - standingW;
+    const promised = promiseTier(rest, budget, now, ratios);
+    const seed = standing.concat(promised);
+
     const targetSamples = Math.min(60, Math.max(20, pool.length * 3));
-
     const candidates = [];
     const seen = new Set();
     for(let i = 0; i < targetSamples; i++){
-      const s = drawToCapRandom(pool, cap, promised, now);
+      const s = drawToCapRandom(pool, cap, seed, ratios);
       if(!s.length) continue;
-      // Dedupe on the set of ids so we count distinct subsets, not draws
       const key = s.map(x => x.id).sort().join('|');
       if(seen.has(key)) continue;
       seen.add(key);
@@ -1261,18 +1694,58 @@
       candidates.push({ subset: s, totalW, splitDiff });
     }
 
-    if(!candidates.length) return drawToCapRandom(pool, cap, promised, now);
+    if(!candidates.length) return drawToCapRandom(pool, cap, seed, ratios);
 
     // Prefer subsets that can be split within tolerance. If none, use all.
     const splittable = candidates.filter(c => c.splitDiff <= WEEK_TOL + 1e-9);
     const bucket = splittable.length ? splittable : candidates;
-
-    // Uniform random over the qualifying bucket
     return bucket[Math.floor(Math.random() * bucket.length)].subset;
   }
 
+  // Due weekly chores, most overdue first, as many as fit under the cap.
+  function standingTier(pool, cap, ratios){
+    const ratioOf = c => (ratios && ratios.has(c.id)) ? ratios.get(c.id) : overdueRatio(c);
+    const weekly = pool
+      .filter(isWeeklyChore)
+      .map(c => ({ c, r: ratioOf(c), jitter: Math.random() }))
+      .sort((a, b) => (b.r - a.r) || (a.jitter - b.jitter));
+    const picked = [];
+    let total = 0;
+    for(const x of weekly){
+      const w = x.c.weight || 0;
+      if(total + w > cap + 1e-9) continue;
+      picked.push(x.c);
+      total += w;
+    }
+    return picked;
+  }
+
+  // The reserved slice: most-overdue-by-ratio first until the budget is spent.
+  // Ratios are bucketed so equally-late chores shuffle rather than locking in.
+  // We keep scanning past something that doesn't fit, so a light late chore can
+  // still use leftover budget.
+  function promiseTier(pool, budget, now, ratios){
+    if(!(budget > 0)) return [];
+    const ratioOf = c => (ratios && ratios.has(c.id)) ? ratios.get(c.id) : overdueRatio(c, now);
+    const bucketOf = r => Math.floor(r / Math.max(1e-6, PROMISE_BUCKET));
+    const ranked = pool
+      .map(c => ({ c, r: ratioOf(c), jitter: Math.random() }))
+      .filter(x => x.r >= 0)
+      .sort((a, b) => (bucketOf(b.r) - bucketOf(a.r)) || (a.jitter - b.jitter));
+
+    const picked = [];
+    let total = 0;
+    for(const x of ranked){
+      const w = x.c.weight || 0;
+      if(total + w > budget + 1e-9) continue;
+      picked.push(x.c);
+      total += w;
+    }
+    return picked;
+  }
+
   // Returns the minimum |sum - 2*s| across all achievable subset sums s
-  // (i.e., the best possible weekly split diff). Uses bit-DP in half-units.
+  // (the best possible weekly split diff). Uses bit-DP in half-units.
   function minSplitDiff(items){
     if(items.length === 0) return 0;
     const wU = items.map(i => Math.max(1, Math.round((i.weight || 0) * 2)));
@@ -1291,75 +1764,27 @@
     return bestDiffU / 2;
   }
 
-  // --------- Urgency: cadence as a promise ---------
-  // How many cadence periods past due a chore is, normalized by its OWN
-  // cadence. 0 = came due this instant, 1 = a full period late, <0 = not due.
-  // Normalizing is the point: it ranks a 7-day chore 14 days late (2.0) above a
-  // 30-day chore 4 days late (0.13), which raw "days late" would get backwards.
-  function overdueRatio(c, now){
-    now = now || Date.now();
-    const meta = state.meta[c.id] || {};
-    const lastDone = meta.lastDoneTs || 0;
-    if(!lastDone) return NEVER_DONE_RATIO;
-
-    if(isCycleReset(c)){
-      const periodMs = Math.max(1, cycleLengthDays()) * MS_DAY;
-      const cs = currentCycleStartTs(now);
-      if(lastDone >= cs) return -1;           // already done this cycle
-      return (now - cs) / periodMs;
-    }
-
-    const periodMs = clampNum(c.cadenceDays, 1, 365, DEFAULT_CADENCE_DAYS) * MS_DAY;
-    return (now - (lastDone + periodMs)) / periodMs;
-  }
-
-  // The reserved slice of the week: most-overdue-by-ratio first, until the
-  // budget is spent. Ratios are bucketed before ranking, so chores that are
-  // late by indistinguishable amounts shuffle instead of locking into the same
-  // order week after week. We keep scanning past something that doesn't fit, so
-  // a light late chore can still use the leftover budget.
-  function promiseTier(pool, cap, now){
-    const budget = cap * clampNum(PROMISE_RESERVE, 0, 1, 0.5);
-    if(!(budget > 0)) return [];
-
-    const bucketOf = r => Math.floor(r / Math.max(1e-6, PROMISE_BUCKET));
-    const ranked = pool
-      .map(c => ({ c, r: overdueRatio(c, now), jitter: Math.random() }))
-      .filter(x => x.r >= 0)
-      .sort((a, b) => (bucketOf(b.r) - bucketOf(a.r)) || (a.jitter - b.jitter));
-
-    const picked = [];
-    let total = 0;
-    for(const x of ranked){
-      const w = x.c.weight || 0;
-      if(total + w > budget + 1e-9) continue;
-      picked.push(x.c);
-      total += w;
-    }
-    return picked;
-  }
-
-  // Odds for the lottery half. `weight` stays the COST against the cap; this is
-  // only the probability of being drawn, so being overdue can raise a chore's
-  // chances without making it more expensive to fit.
-  function pickScore(t, now){
+  // Odds for the lottery. `weight` stays the COST against the cap; this is only
+  // the probability of being drawn.
+  function pickScore(t, ratios){
     const base = t.weight || 1;
     if(!(URGENCY_TILT > 0)) return base;
-    return base * (1 + URGENCY_TILT * Math.max(0, overdueRatio(t, now)));
+    const r = (ratios && ratios.has(t.id)) ? ratios.get(t.id) : overdueRatio(t);
+    return base * (1 + URGENCY_TILT * Math.max(0, r));
   }
 
-  // `seed` is the promise tier: already-decided items every candidate subset
-  // starts from. They are charged against the cap like anything else.
-  function drawToCapRandom(pool, cap, seed, now){
+  // `seed` is everything already decided (weekly + promised); every candidate
+  // subset starts from it and it's charged against the cap like anything else.
+  function drawToCapRandom(pool, cap, seed, ratios){
     const picked=(seed||[]).slice();
     const seedIds=new Set(picked.map(t=>t.id));
     const remaining=pool.filter(t=>!seedIds.has(t.id));
     let total=picked.reduce((s,t)=>s+(t.weight||0),0);
     let guard=1000;
     while(guard-- && remaining.length){
-      const feasible=remaining.filter(t=> total+(t.weight||0) <= cap);
+      const feasible=remaining.filter(t=> total+(t.weight||0) <= cap + 1e-9);
       if(!feasible.length) break;
-      const chosen=weightedPick(feasible, now);
+      const chosen=weightedPick(feasible, ratios);
       picked.push(chosen);
       total += (chosen.weight||0);
       const idx=remaining.findIndex(x=>x.id===chosen.id);
@@ -1372,16 +1797,15 @@
     return picked;
   }
 
-  function weightedPick(list, now){
-    const tot=list.reduce((s,t)=>s+pickScore(t, now),0);
+  function weightedPick(list, ratios){
+    const tot=list.reduce((s,t)=>s+pickScore(t, ratios),0);
     if(!(tot > 0)) return list[Math.floor(Math.random()*list.length)];
     let r=Math.random()*tot;
-    for(const it of list){ r -= pickScore(it, now); if(r<=0) return it; }
+    for(const it of list){ r -= pickScore(it, ratios); if(r<=0) return it; }
     return list[list.length-1];
   }
 
-  // Recency lookup: returns the most recent owner of this task from the doneLog,
-  // or null if we don't have a record with one of the current people as owner.
+  // Most recent owner of this task from the doneLog, if they're still a current person.
   function recencyLastOwner(taskId, people){
     const log = Array.isArray(state.doneLog) ? state.doneLog : [];
     for(let i = log.length - 1; i >= 0; i--){
@@ -1401,13 +1825,11 @@
       const weights=items.map(i=>i.weight||0);
       const W=weights.reduce((s,w)=>s+w,0);
       const n=items.length;
-
-      // Who did each task most recently? Used to encourage rotation.
       const lastOwner = items.map(it => recencyLastOwner(it.id, people));
 
       if(n<=22){
-        // Enumerate every possible split; track fairness and rotation score.
-        // rotationScore = # of items assigned to whoever did NOT do it last.
+        // Enumerate every split; track fairness and rotation score
+        // (rotation = # of items going to whoever did NOT do it last).
         let minWeekDiff = Infinity;
         const scored = [];
         for(let mask=0; mask<(1<<n); mask++){
@@ -1417,7 +1839,6 @@
             if(goesToA) s += weights[i];
             const lo = lastOwner[i];
             if(lo !== null){
-              // Reward when the assignee is NOT the previous owner
               if((goesToA && lo === B) || (!goesToA && lo === A)) rot++;
             }
           }
@@ -1426,22 +1847,19 @@
           scored.push({ mask, weekDiff, rot });
         }
 
-        // Any split within tolerance of the best is "fair enough" for this week.
         const wdCeiling = Math.max(minWeekDiff, WEEK_TOL) + 1e-9;
         const fair = scored.filter(m => m.weekDiff <= wdCeiling);
 
-        // Among fair splits, prefer maximum rotation.
         let maxRot = -Infinity;
         for(const m of fair) if(m.rot > maxRot) maxRot = m.rot;
         const topRot = fair.filter(m => m.rot === maxRot);
 
-        // Random tiebreak so we don't lock into the same "best" every draw.
         const chosen = topRot[Math.floor(Math.random() * topRot.length)];
         return items.map((it,i) => ({...it, owner: ((chosen.mask & (1<<i)) !== 0) ? A : B}));
       }
     }
 
-    // Fallback for >2 people or n>22: shuffled greedy (also randomized).
+    // Fallback for >2 people or n>22: shuffled greedy.
     const shuffled = [...items];
     for(let i = shuffled.length - 1; i > 0; i--){
       const j = Math.floor(Math.random() * (i + 1));
@@ -1466,18 +1884,27 @@
     maybeAutoAdvance();
 
     const now=Date.now();
+    const curWs = weekStartTs(now);
     const cycleStart = currentCycleStartTs(now);
     const cycleEnd = nextCycleStartTs(cycleStart);
 
-    // Cycle pill + early-start notice + workload math
+    weekPill.textContent = 'Week of ' + weekRangeLabel(curWs);
     cyclePill.textContent = formatCycleLabel(cycleStart, cycleEnd);
     renderCycleNotice(cycleStart);
     renderWorkloadHint();
     if(uiReady) syncCycleInputs();
 
     const due=getDueTasks();
-    const openIds=Object.keys(state.open||{});
-    const openTasks=openIds.map(id=> getTaskById(id)).filter(Boolean);
+    const openEntries = Object.entries(state.open||{})
+      .map(([id, o]) => ({ id, o, t: getTaskById(id), ws: openWeekStart(o) }))
+      .filter(x => x.t);
+    const openTasks = openEntries.map(x => x.t);
+    const thisWeekOpen = openEntries
+      .filter(x => x.ws >= curWs)
+      .sort((a,b)=>(a.o.assignedTs||0)-(b.o.assignedTs||0));
+    const leftovers = openEntries
+      .filter(x => x.ws < curWs)
+      .sort((a,b)=>(a.ws-b.ws) || a.t.name.localeCompare(b.t.name));
 
     // Assignment history across months, filtered to this cycle
     const allBatches = Object.values(state.months || {})
@@ -1485,7 +1912,7 @@
     const batchesThisCycle = allBatches.filter(h => (h.ts||0) >= cycleStart && (h.ts||0) < cycleEnd);
     const assignedWeight = batchesThisCycle.reduce((s,h)=>s+(h.total||0),0);
 
-    // Done weight this cycle: sum of weights for tasks whose lastDoneTs is within this cycle
+    // Done weight this cycle
     let doneWeight=0;
     for(const c of chores){
       const ld=(state.meta[c.id] && state.meta[c.id].lastDoneTs) ? state.meta[c.id].lastDoneTs : 0;
@@ -1508,7 +1935,6 @@
         }
       }
     }
-    // Include completions this cycle whose owner didn't come through a batch
     const doneLog0 = Array.isArray(state.doneLog) ? state.doneLog : [];
     const seenInBatch = new Set();
     for(const h of batchesThisCycle){
@@ -1526,14 +1952,23 @@
       ? ' • ' + people.map(p => escapeHtml(p) + ' ' + (personTotals.get(p) || 0).toFixed(1)).join(' / ')
       : '';
 
-    cycleStats.innerHTML = 'Done '+doneWeight.toFixed(1)+' wt • Outstanding '+openTasks.length+' • Due '+due.length+' • Assigned '+assignedWeight.toFixed(1)+' wt'+balanceStr;
+    cycleStats.innerHTML = 'Done '+doneWeight.toFixed(1)+' wt • Open '+openTasks.length+' • Due '+due.length+' • Assigned '+assignedWeight.toFixed(1)+' wt'+balanceStr;
 
-    // Outstanding
+    // Needs check-off (earlier weeks)
+    leftoverEl.innerHTML='';
+    leftoverWrap.classList.toggle('is-hidden', !leftovers.length);
+    if(leftovers.length){
+      const wks = Array.from(new Set(leftovers.map(x => x.ws))).sort((a,b)=>a-b);
+      leftoverMeta.textContent = leftovers.length + ' open • ' + wks.map(w => weekLabel(w, now)).join(', ');
+      leftovers.forEach(x => leftoverEl.appendChild(taskCard({...x.t, owner: x.o.owner}, {mode:'leftover'})));
+    }
+
+    // This week
     outstandingEl.innerHTML='';
-    outstandingMeta.textContent = openTasks.length ? (openTasks.length+' tasks') : 'None 🎉';
-    openTasks
-      .sort((a,b)=>(state.open[a.id].assignedTs||0)-(state.open[b.id].assignedTs||0))
-      .forEach(t=> outstandingEl.appendChild(taskCard(t, {mode:'outstanding'})));
+    const weekUsed = weekAssignedWeight(curWs);
+    outstandingMeta.textContent = (thisWeekOpen.length ? (thisWeekOpen.length + ' open') : (weekUsed > 0 ? 'All done 🎉' : 'Nothing drawn yet'))
+      + ' • ' + weekUsed.toFixed(1) + ' / ' + getCap() + ' wt drawn';
+    thisWeekOpen.forEach(x => outstandingEl.appendChild(taskCard({...x.t, owner: x.o.owner}, {mode:'outstanding'})));
 
     // Completed (this cycle)
     completedEl.innerHTML='';
@@ -1542,7 +1977,7 @@
       .filter(ev=>ev && typeof ev.ts==='number' && ev.ts>=cycleStart && ev.ts<=now)
       .sort((a,b)=>b.ts-a.ts);
 
-    let latestById = new Map();
+    const latestById = new Map();
     if(doneThisCycle.length){
       for(const ev of doneThisCycle){
         if(!latestById.has(ev.id)) latestById.set(ev.id, ev);
@@ -1568,40 +2003,40 @@
       if(t) completedEl.appendChild(taskCard({...t, owner: ev.owner || getOwnerForTask(t.id), _completedTs: ev.ts}, {mode:'completed'}));
     });
 
-    // Last batch (across all months)
+    // Last draw (across all months)
     lastDrawEl.innerHTML='';
-    const last = allBatches.sort((a,b)=>(b.ts||0)-(a.ts||0))[0] || null;
+    const last = allBatches.slice().sort((a,b)=>(b.ts||0)-(a.ts||0))[0] || null;
     lastDrawMeta.textContent = last
-      ? (last.items.length+' tasks • '+new Date(last.ts).toLocaleString([], {month:'short', day:'numeric'}))
+      ? (last.items.length+' tasks • for '+weekPhrase(batchWeekStart(last), now)+' • drawn '+new Date(last.ts).toLocaleString([], {weekday:'short', month:'short', day:'numeric'}))
       : '—';
     (last ? last.items : []).forEach(it=>{
       const t=getTaskById(it.id);
-      if(t) lastDrawEl.appendChild(taskCard({...t, owner: it.owner || getOwnerForTask(t.id)}, {mode:'last'}));
+      if(t) lastDrawEl.appendChild(taskCard({...t, owner: it.owner || getOwnerForTask(t.id)}, {mode:'last', status: itemStatus(last, it), batchTs: last.ts}));
     });
 
-    // Due list
+    // Due list, most overdue first
     dueEl.innerHTML='';
     if(due.length){
-      dueMeta.textContent = due.length+' due';
+      const late = due.filter(t => overdueRatio(t, now) >= 1).length;
+      dueMeta.textContent = due.length + ' due' + (late ? ' • ' + late + ' overdue' : '');
     } else {
       const soonest = soonestDueTs();
-      dueMeta.textContent = soonest
-        ? ('None due — next one ' + fmtIn(soonest) + ' (' + new Date(soonest).toLocaleDateString() + ')')
-        : 'None due right now';
+      dueMeta.textContent = soonest ? ('None due — the next one comes due ' + fmtDue(soonest)) : 'None due right now';
     }
+    const dueRatios = new Map(due.map(t => [t.id, overdueRatio(t, now)]));
     due
-      .sort((a,b)=> nextDueTs(a)-nextDueTs(b))
+      .slice()
+      .sort((a,b)=> (dueRatios.get(b.id) - dueRatios.get(a.id)) || a.name.localeCompare(b.name))
       .forEach(t=> dueEl.appendChild(taskCard(t, {mode:'due'})));
 
     renderTable();
-    // Refresh history-tab data too so it stays in sync even when hidden
     renderHistory();
   }
 
   function renderCycleNotice(cycleStart){
     const kind = (state.cycleStartsMeta || {})[cycleStart];
     if(kind === 'auto' || kind === 'manual'){
-      const when = new Date(cycleStart).toLocaleDateString([], {month:'short', day:'numeric'});
+      const when = fmtShortDate(cycleStart);
       cycleNotice.textContent = (kind === 'auto'
         ? 'Everything was cleared, so a fresh cycle started early on ' + when + '. '
         : 'You started this cycle early on ' + when + '. ')
@@ -1633,7 +2068,7 @@
           : ' — comfortably inside your pace.');
   }
 
-  // Collect every draw batch across all months as a flat, sortable list.
+  // Every draw batch across all months as a flat list, newest first.
   function getAllBatchesFlat(){
     const out = [];
     for(const [mk, mm] of Object.entries(state.months || {})){
@@ -1641,6 +2076,7 @@
       for(const h of hist){
         out.push({
           ts: h.ts || 0,
+          weekStart: batchWeekStart(h),
           items: h.items || [],
           total: h.total || 0,
           finish: !!h.finish,
@@ -1648,7 +2084,6 @@
         });
       }
     }
-    // Newest first
     out.sort((a,b) => (b.ts||0) - (a.ts||0));
     return out;
   }
@@ -1657,13 +2092,11 @@
     const batches = getAllBatchesFlat();
     const doneLog = Array.isArray(state.doneLog) ? state.doneLog : [];
 
-    // Discover people we've ever assigned to (from batches + doneLog + current input)
     const peopleSet = new Set(readPeople());
     for(const b of batches) for(const it of b.items) if(it.owner) peopleSet.add(it.owner);
     for(const ev of doneLog) if(ev && ev.owner) peopleSet.add(ev.owner);
     const allPeople = Array.from(peopleSet).sort();
 
-    // Build the chore filter list from batch items + current chores
     const choresById = new Map();
     for(const c of chores) choresById.set(c.id, c.name);
     for(const b of batches) for(const it of b.items){
@@ -1671,13 +2104,12 @@
     }
     const allChores = Array.from(choresById.entries()).sort((a,b)=>a[1].localeCompare(b[1]));
 
-    // Refresh filter dropdowns while preserving current selection
     syncSelectOptions(historyFilterPerson, [['', 'Anyone']].concat(allPeople.map(p => [p, p])));
     syncSelectOptions(historyFilterChore, [['', 'Any chore']].concat(allChores));
 
     const filterPerson = historyFilterPerson.value || '';
     const filterChore  = historyFilterChore.value || '';
-    const groupBy      = historyGroupBy.value || 'cycle';
+    const groupBy      = historyGroupBy.value || 'week';
 
     // ---- All-time totals (per person).
     const perPersonAssigned = new Map();
@@ -1721,12 +2153,8 @@
 
     // ---- Filtered batches
     const filtered = batches.filter(b=>{
-      if(filterPerson){
-        if(!b.items.some(it => it.owner === filterPerson)) return false;
-      }
-      if(filterChore){
-        if(!b.items.some(it => it.id === filterChore)) return false;
-      }
+      if(filterPerson && !b.items.some(it => it.owner === filterPerson)) return false;
+      if(filterChore && !b.items.some(it => it.id === filterChore)) return false;
       return true;
     });
 
@@ -1735,20 +2163,17 @@
           + (filterPerson || filterChore ? ' (filtered from ' + batches.length + ')' : ''))
       : (batches.length ? 'No draws match the filter' : 'No draws yet');
 
-    // ---- Group and render
     historyListEl.innerHTML = '';
     const groups = groupBatches(filtered, groupBy);
     for(const g of groups){
       historyListEl.appendChild(renderHistoryGroup(g, filterPerson, filterChore));
     }
 
-    // ---- Completion log (chronological, most recent 100 by default)
     renderCompletionLog(doneLog, filterPerson, filterChore);
   }
 
   function syncSelectOptions(sel, pairs){
     const prev = sel.value;
-    // Only replace if the options actually changed to avoid focus/scroll churn
     const wanted = pairs.map(p => p[0]+'::'+p[1]).join('|');
     if(sel.dataset._sig === wanted) return;
     sel.dataset._sig = wanted;
@@ -1759,7 +2184,6 @@
       o.textContent = label;
       sel.appendChild(o);
     }
-    // Restore previous selection if still available
     const stillThere = pairs.some(p => p[0] === prev);
     sel.value = stillThere ? prev : '';
   }
@@ -1768,26 +2192,28 @@
     if(groupBy === 'none'){
       return [{ key:'all', label:'All draws', batches: batches.slice() }];
     }
+    const nowWs = weekStartTs(Date.now());
     const map = new Map();
     for(const b of batches){
       let key, label;
-      if(groupBy === 'month'){
+      if(groupBy === 'week'){
+        const ws = batchWeekStart(b);
+        key = 'week-' + ws;
+        label = 'Week of ' + weekRangeLabel(ws) + (ws === nowWs ? ' (this week)' : '');
+      } else if(groupBy === 'month'){
         const d = new Date(b.ts);
         key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
         label = d.toLocaleDateString([], {year:'numeric', month:'long'});
       } else {
-        // 'cycle' — group by the recorded boundary that CONTAINS the timestamp
         const cs = cycleStartForTs(b.ts);
         const ce = nextCycleStartTs(cs);
         key = 'cycle-' + cs;
-        const s = new Date(cs), e = new Date(ce - MS_DAY);
         const fmt = d => d.toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'});
-        label = fmt(s) + ' – ' + fmt(e);
+        label = fmt(new Date(cs)) + ' – ' + fmt(new Date(ce - MS_DAY));
       }
       if(!map.has(key)) map.set(key, { key, label, batches: [], firstTs: b.ts });
       const g = map.get(key);
       g.batches.push(b);
-      // Track group ordering by the newest ts in it
       if(b.ts > g.firstTs) g.firstTs = b.ts;
     }
     return Array.from(map.values()).sort((a,b) => b.firstTs - a.firstTs);
@@ -1797,13 +2223,19 @@
     const wrap = document.createElement('div');
     wrap.className = 'history-cycle';
     wrap.dataset.groupKey = group.key;
-    const collapsed = historyCollapsed.get(group.key) === true;
-    if(collapsed) wrap.classList.add('collapsed');
+    if(historyCollapsed.get(group.key) === true) wrap.classList.add('collapsed');
 
     const groupTotal = group.batches.reduce((s,b) => s + (b.total || 0), 0);
     const groupItems = group.batches.reduce((s,b) => s + (b.items || []).length, 0);
+    let groupDone = 0, groupMissed = 0;
+    for(const b of group.batches){
+      for(const it of b.items){
+        const st = itemStatus(b, it);
+        if(st === 'done') groupDone++;
+        else if(st === 'missed') groupMissed++;
+      }
+    }
 
-    // Per-person totals inside this group (respecting the filters)
     const perPerson = new Map();
     for(const b of group.batches){
       for(const it of b.items){
@@ -1824,6 +2256,7 @@
       + '<div class="muted" style="margin-top:2px">'
       +   group.batches.length + ' draw' + (group.batches.length===1?'':'s')
       + ' • ' + groupItems + ' item' + (groupItems===1?'':'s')
+      + ' • ' + groupDone + ' done' + (groupMissed ? ', ' + groupMissed + ' not done' : '')
       + ' • total ' + groupTotal.toFixed(1) + ' wt'
       + balanceStr
       + '</div></div>'
@@ -1837,7 +2270,6 @@
 
     const body = document.createElement('div');
     body.className = 'history-cycle-body';
-    // Batches within group: newest first
     const sortedBatches = group.batches.slice().sort((a,b) => (b.ts||0)-(a.ts||0));
     for(const b of sortedBatches){
       body.appendChild(renderBatchCard(b, filterPerson, filterChore));
@@ -1849,28 +2281,26 @@
   function renderBatchCard(b, filterPerson, filterChore){
     const card = document.createElement('div');
     card.className = 'history-batch';
-    const d = new Date(b.ts);
-    const when = d.toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+    const when = new Date(b.ts).toLocaleString([], {weekday:'short', month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
     const tag = b.finish ? ' • Finish-due' : '';
 
     const meta = document.createElement('div');
     meta.className = 'history-batch-meta';
     meta.innerHTML = ''
-      + '<span>' + escapeHtml(when) + tag + '</span>'
+      + '<span>For ' + escapeHtml(weekPhrase(b.weekStart) + ' • drawn ' + when) + tag + '</span>'
       + '<span>' + b.items.length + ' item' + (b.items.length===1?'':'s')
       + ' • ' + (b.total || 0).toFixed(1) + ' wt</span>';
     card.appendChild(meta);
 
-    // Items — sort by owner then weight desc for readability
-    const items = b.items.slice().sort((a,b) => {
-      const oa = (a.owner || '~').toLowerCase();
-      const ob = (b.owner || '~').toLowerCase();
-      if(oa !== ob) return oa.localeCompare(ob);
-      return (b.weight||0) - (a.weight||0);
+    const items = b.items.slice().sort((x,y) => {
+      const ox = (x.owner || '~').toLowerCase();
+      const oy = (y.owner || '~').toLowerCase();
+      if(ox !== oy) return ox.localeCompare(oy);
+      return (y.weight||0) - (x.weight||0);
     });
     for(const it of items){
-      // Grey out items filtered out (so the batch is still readable in context)
       const dim = (filterPerson && it.owner !== filterPerson) || (filterChore && it.id !== filterChore);
+      const st = itemStatus(b, it);
       const row = document.createElement('div');
       row.className = 'history-item';
       if(dim) row.style.opacity = '0.35';
@@ -1878,7 +2308,7 @@
         ? '<span class="item-owner">' + escapeHtml(it.owner) + '</span>'
         : '<span class="item-owner no-owner">unassigned</span>';
       row.innerHTML = ''
-        + '<span>' + escapeHtml(it.name || it.id) + '</span>'
+        + '<span>' + escapeHtml(it.name || it.id) + '<span class="item-status ' + escapeHtml(st) + '">' + escapeHtml(statusLabel(st)) + '</span></span>'
         + '<span class="item-weight">' + (it.weight||0).toFixed(1) + ' wt</span>'
         + ownerHtml;
       card.appendChild(row);
@@ -1907,8 +2337,11 @@
     const card = document.createElement('div');
     card.className = 'history-batch';
     for(const ev of shown){
-      const d = new Date(ev.ts);
-      const when = d.toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+      const ws = weekStartTs(ev.ts);
+      const lateCheck = ev.markedTs && weekStartTs(ev.markedTs) !== ws;
+      const when = lateCheck
+        ? 'For the week of ' + weekRangeLabel(ws) + ' • checked off ' + fmtShortDate(ev.markedTs)
+        : new Date(ev.ts).toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
       const row = document.createElement('div');
       row.className = 'history-item';
       const ownerHtml = ev.owner
@@ -1924,40 +2357,68 @@
   }
 
   function formatCycleLabel(cycleStart, cycleEnd){
-    const fmt = d => d.toLocaleDateString([], {month:'short', day:'numeric'});
-    const s = new Date(cycleStart);
-    const e = new Date(cycleEnd - MS_DAY);
+    const s = fmtShortDate(cycleStart);
+    const e = fmtShortDate(addDaysTs(cycleEnd, -1));
     if(getCycleMode() === 'rolling'){
-      return 'Cycle: '+fmt(s)+' – '+fmt(e)+' ('+getWeeksPerCycle()+'w'+(state.autoSizeWeeks?', auto':'')+')';
+      return 'Cycle: '+s+' – '+e+' ('+getWeeksPerCycle()+'w'+(state.autoSizeWeeks?', auto':'')+')';
     }
-    return 'Cycle: '+fmt(s)+' – '+fmt(e);
+    return 'Cycle: '+s+' – '+e;
+  }
+
+  function statusBadge(status){
+    if(status === 'done') return '<span class="badge due">Done</span>';
+    if(status === 'missed') return '<span class="badge overdue">Not done</span>';
+    if(status === 'skipped') return '<span class="badge snoozed">Skipped</span>';
+    if(status === 'open') return '<span class="badge">Open</span>';
+    return '<span class="badge">Cleared</span>';
+  }
+
+  function fmtDue(ts){
+    const now = Date.now();
+    const cur = weekStartTs(now);
+    const ws = weekStartTs(ts);
+    if(ts <= now || ws <= cur) return 'this week';
+    const w = weeksBetween(cur, ws);
+    if(w === 1) return 'next week';
+    return 'week of ' + fmtShortDate(ws) + ' (' + w + ' wks)';
   }
 
   function taskCard(t, opts){
     const mode = (opts && opts.mode) ? opts.mode : 'due';
+    const now = Date.now();
+    const curWs = weekStartTs(now);
     const meta = state.meta[t.id] || {};
     const ld = meta.lastDoneTs || 0;
-    const snoozeUntil = meta.snoozeUntilTs || 0;
-    const dueTs = nextDueTs(t);
-    const now = Date.now();
-
-    // Resolve owner: prefer explicit on passed object, then live outstanding, then sticky cycle assignment
+    const open = state.open[t.id] || null;
+    const openWs = open ? openWeekStart(open) : 0;
     const owner = (t.owner && String(t.owner)) ? t.owner : getOwnerForTask(t.id);
+    const status = (opts && opts.status) || '';
+    // On the "last draw" card, only act if this exact assignment is still open.
+    const lastIsOpen = (mode === 'last') && !!open && !!opts && open.assignedTs === opts.batchTs;
 
-    const badge = (function(){
-      if(snoozeUntil && now < snoozeUntil) return '<span class="badge snoozed">Snoozed</span>';
-      if(mode==='outstanding') return '<span class="badge overdue">Outstanding</span>';
-      if(mode==='completed') return '<span class="badge due">Completed</span>';
-      if(isDueNow(t, now)) return '<span class="badge due">Due</span>';
-      return '<span class="badge">Not due</span>';
-    })();
+    let badge;
+    if(mode === 'leftover'){
+      badge = '<span class="badge overdue">' + escapeHtml(weekLabel(openWs, now)) + '</span>';
+    } else if(mode === 'outstanding'){
+      badge = '<span class="badge">This week</span>';
+    } else if(mode === 'completed'){
+      badge = '<span class="badge due">Completed</span>';
+    } else if(mode === 'last'){
+      badge = statusBadge(status);
+    } else if(isSnoozedAt(meta, now)){
+      badge = '<span class="badge snoozed">Skipped until ' + escapeHtml(fmtShortDate(weekStartTs(meta.snoozeUntilTs))) + '</span>';
+    } else if(isDueNow(t, now)){
+      badge = (overdueRatio(t, now) >= 1) ? '<span class="badge overdue">Overdue</span>' : '<span class="badge due">Due</span>';
+    } else {
+      badge = '<span class="badge">Not due</span>';
+    }
 
     const div=document.createElement('div');
     div.className='task-card';
 
     const line1 = '<h3 class="task-title">'+escapeHtml(t.name)+'</h3>';
 
-    const ownerClass = (mode==='completed' || mode==='outstanding') ? 'owner-badge' : 'owner-badge muted-owner';
+    const ownerClass = (mode==='completed' || mode==='outstanding' || mode==='leftover') ? 'owner-badge' : 'owner-badge muted-owner';
     const line2 = '<div class="muted">'
       +'Weight <b>'+(t.weight||0).toFixed(1)+'</b>'
       +' • Cadence <b>'+clampNum(t.cadenceDays,1,365,DEFAULT_CADENCE_DAYS)+'</b>d'
@@ -1967,27 +2428,42 @@
 
     const completedTs = (t && t._completedTs) ? t._completedTs : 0;
     const line3 = '<div class="muted" style="margin-top:6px">'
-      +(mode==='completed' ? ('Completed: <b>'+new Date(completedTs || ld || 0).toLocaleString([], {month:'short', day:'numeric'})+'</b> • ') : '')
+      +(mode==='completed' ? ('Completed: <b>'+escapeHtml(fmtShortDate(completedTs || ld || now))+'</b> • ') : '')
+      +(mode==='leftover' ? ('Drawn for <b>'+escapeHtml(weekRangeLabel(openWs))+'</b> • ') : '')
       +'Last done: <b>'+(ld? fmtAgo(ld) : 'never')+'</b>'
-      +' • Next due: <b>'+fmtIn(dueTs)+'</b>'
+      +' • Next due: <b>'+escapeHtml(fmtDue(nextDueTs(t)))+'</b>'
       +'</div>';
 
-    const tags = (t.tags||[]).map(tag=>'<span class="pill">'+escapeHtml(tag)+'</span>').join('');
+    const tags = (isWeeklyChore(t) ? '<span class="pill">Weekly</span>' : '')
+      + (t.tags||[]).map(tag=>'<span class="pill">'+escapeHtml(tag)+'</span>').join('');
 
     const actions=document.createElement('div');
     actions.className='actions';
 
-    const doneBtn = mkBtn('Mark done', 'btn sm success', ()=>markDone(t.id));
-    const snooze7 = mkBtn('Snooze 7d', 'btn sm secondary', ()=>snooze(t.id, 7));
-    const snooze14 = mkBtn('Snooze 14d', 'btn sm secondary', ()=>snooze(t.id, 14));
+    const leftoverButtons = () => {
+      actions.appendChild(mkBtn('Done', 'btn sm success', ()=>markDone(t.id), 'Counts for ' + weekPhrase(openWs, now)));
+      actions.appendChild(mkBtn('Not done', 'btn sm danger', ()=>markMissed(t.id), 'Back in the pool for this week'));
+    };
+    const openButtons = () => {
+      actions.appendChild(mkBtn('Mark done', 'btn sm success', ()=>markDone(t.id)));
+      actions.appendChild(mkBtn('Skip a week', 'btn sm secondary', ()=>snooze(t.id, 1), 'Releases it and brings it back next Sunday'));
+    };
 
-    if(mode==='outstanding' || mode==='last' || mode==='due'){
-      actions.appendChild(doneBtn);
-      actions.appendChild(snooze7);
-      actions.appendChild(snooze14);
-    }
-    if(mode==='completed'){
-      actions.appendChild(mkBtn('Mark not done', 'btn sm danger', ()=>markNotDone(t.id)));
+    if(mode==='leftover'){
+      leftoverButtons();
+    } else if(mode==='outstanding'){
+      openButtons();
+    } else if(mode==='last'){
+      if(lastIsOpen){
+        if(openWs < curWs) leftoverButtons();
+        else openButtons();
+      }
+    } else if(mode==='due'){
+      actions.appendChild(mkBtn('Mark done', 'btn sm success', ()=>markDone(t.id)));
+      actions.appendChild(mkBtn('Skip a week', 'btn sm secondary', ()=>snooze(t.id, 1)));
+      actions.appendChild(mkBtn('Skip 2 weeks', 'btn sm secondary', ()=>snooze(t.id, 2)));
+    } else if(mode==='completed'){
+      actions.appendChild(mkBtn('Mark not done', 'btn sm danger', ()=>markNotDone(t.id), 'Undo this completion'));
     }
 
     div.innerHTML = line1 + line2 + line3 + '<div class="badges">'+tags+'</div>';
@@ -2018,10 +2494,10 @@
         '<td><input type="checkbox" '+(c.enabled!==false?'checked':'')+' data-k="enabled" data-i="'+i+'" /></td>'+
         '<td><input type="text" value="'+escapeHtml((c.tags||[]).join(', '))+'" data-k="tags" data-i="'+i+'" /></td>'+
         '<td class="muted">'+(ld? new Date(ld).toLocaleDateString()+' ('+fmtAgo(ld)+')' : 'never')+'</td>'+
-        '<td class="muted">'+(nd? new Date(nd).toLocaleDateString()+' ('+fmtIn(nd)+')' : '—')+'</td>'+
+        '<td class="muted">'+escapeHtml(fmtDue(nd))+'</td>'+
         '<td>'
           +'<button class="btn sm success" data-done="'+escapeHtml(c.id)+'">Done</button> '
-          +'<button class="btn sm secondary" data-snooze="'+escapeHtml(c.id)+'" data-days="7">Snooze 7d</button> '
+          +'<button class="btn sm secondary" data-snooze="'+escapeHtml(c.id)+'" data-weeks="1">Skip a week</button> '
           +'<button class="btn sm danger" data-del="'+i+'">Delete</button>'
         +'</td>';
 
@@ -2055,7 +2531,7 @@
       btn.addEventListener('click', e=> markDone(e.target.dataset.done));
     });
     tableBody.querySelectorAll('button[data-snooze]').forEach(btn=>{
-      btn.addEventListener('click', e=> snooze(e.target.dataset.snooze, +e.target.dataset.days || 7));
+      btn.addEventListener('click', e=> snooze(e.target.dataset.snooze, +e.target.dataset.weeks || 1));
     });
     tableBody.querySelectorAll('button[data-del]').forEach(btn=>{
       btn.addEventListener('click', e=>{
@@ -2065,7 +2541,6 @@
         chores.splice(idx,1);
         delete state.open[id];
         delete state.meta[id];
-        // Also strip from cycle assignments buckets
         if(state.cycleAssignments){
           for(const k of Object.keys(state.cycleAssignments)){
             if(state.cycleAssignments[k]) delete state.cycleAssignments[k][id];
@@ -2104,13 +2579,13 @@
 
   function exportJSON(){
     try{
-      const payload={version:4, chores, state};
+      const payload={version:5, chores, state};
       const data=JSON.stringify(payload,null,2);
       const blob=new Blob([data],{type:'application/json'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url;
-      a.download='chores-'+monthKey()+'-v4.json';
+      a.download='chores-'+monthKey()+'-v5.json';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -2173,6 +2648,8 @@
           state.flexPct = Math.min(0.9, Math.max(0, json.state.flexPct));
           flexInput.value = Math.round(state.flexPct*100);
         }
+        // Older exports get the same one-time cleanup as older saved data.
+        state.schemaVersion = (typeof json.state.schemaVersion === 'number') ? json.state.schemaVersion : 0;
         const m=monthKey();
         if(!state.months[m]) state.months[m] = { history: [] };
         save(LS_STATE, state);
@@ -2187,31 +2664,31 @@
   }
 
   // --------- Animation ---------
-  // Resolves with 'confirm' | 'reroll' | 'cancel' based on the user's choice
-  // after the animation completes. The overlay is only closed on confirm/cancel;
-  // on reroll it stays open (the outer loop calls animateDraw again).
+  // Resolves with 'confirm' | 'reroll' | 'cancel'. The overlay closes on
+  // confirm/cancel; on reroll it stays open for the next round.
   function animateDraw(items, opts){
     return new Promise(async resolve=>{
-      const overlay=document.getElementById('drawOverlay');
       const list=document.getElementById('drawList');
+      const title=document.getElementById('drawTitle');
       const meta=document.getElementById('drawMeta');
       const skipBtn=document.getElementById('skipDraw');
-      const drawBtn=document.getElementById('drawBtn');
       const animActions=document.getElementById('drawActionsAnimating');
       const decideActions=document.getElementById('drawActionsDecide');
       const cancelBtn=document.getElementById('cancelDraw');
       const rerollBtn=document.getElementById('rerollDraw');
       const confirmBtn=document.getElementById('confirmDraw');
 
+      const ws = (opts && typeof opts.weekStart === 'number') ? opts.weekStart : weekStartTs(Date.now());
       const rerollCount = (opts && typeof opts.rerollCount === 'number') ? opts.rerollCount : 0;
       const rerollTag = rerollCount > 0 ? ' • reroll #' + rerollCount : '';
-      meta.textContent = items.length+' task'+(items.length!==1?'s':'')+' • cap '+getCap()+rerollTag;
-      list.innerHTML='';
-      overlay.classList.add('show');
-      overlay.setAttribute('aria-hidden','false');
-      if(drawBtn) drawBtn.disabled=true;
+      const capNote = (opts && opts.capNote) ? opts.capNote : ('cap ' + getCap());
 
-      // While animating: show Skip, hide decision buttons
+      openOverlay();
+      setOverlayMode('draw');
+      title.textContent = 'Draw for ' + weekRangeLabel(ws);
+      meta.textContent = items.length+' task'+(items.length!==1?'s':'')+' • '+capNote+rerollTag;
+      list.innerHTML='';
+
       animActions.classList.remove('hidden');
       decideActions.classList.add('hidden');
 
@@ -2235,7 +2712,7 @@
         card.appendChild(roller);
         card.appendChild(note);
         list.appendChild(card);
-        list.scrollTop=list.scrollHeight;
+        if(card.scrollIntoView) card.scrollIntoView({block:'nearest'});
 
         if(!skipped){
           const tick=75;
@@ -2247,7 +2724,8 @@
 
         roller.classList.add('final');
         roller.textContent = items[i].name;
-        note.textContent = 'Weight '+(items[i].weight||0).toFixed(1);
+        note.textContent = 'Weight '+(items[i].weight||0).toFixed(1)
+          + (isWeeklyChore(items[i]) ? ' • weekly' : '');
         card.style.animation='pop .45s ease';
         burstConfetti(card, 14);
 
@@ -2276,23 +2754,15 @@
         if(!skipped) await sleep(220);
       }
 
-      // Animation complete — swap in decision buttons and wait for input
       await sleep(150);
       animActions.classList.add('hidden');
       decideActions.classList.remove('hidden');
 
       const finish = (action)=>{
-        // Detach all listeners so a reroll draws fresh handlers
         cancelBtn.removeEventListener('click', onCancel);
         rerollBtn.removeEventListener('click', onReroll);
         confirmBtn.removeEventListener('click', onConfirm);
-        if(action === 'confirm' || action === 'cancel'){
-          overlay.classList.remove('show');
-          overlay.setAttribute('aria-hidden','true');
-          if(drawBtn) drawBtn.disabled=false;
-        }
-        // On reroll we leave the overlay open; the next animateDraw call
-        // will re-enter with a cleared list.
+        if(action === 'confirm' || action === 'cancel') closeOverlay();
         resolve(action);
       };
       const onCancel = ()=> finish('cancel');
@@ -2324,7 +2794,11 @@
 
   // --------- Utils ---------
   function load(k){ try{ return JSON.parse(localStorage.getItem(k)); } catch{ return null; } }
-  function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+  function save(k,v){
+    if(!persistEnabled) return;
+    try{ localStorage.setItem(k, JSON.stringify(v)); }
+    catch(err){ console.error('[Chores] save failed', err); }
+  }
 
   function slug(s){
     s=String(s||'').toLowerCase();
@@ -2398,490 +2872,581 @@
     return d+'d ago';
   }
 
-  function fmtIn(ts){
-    const d=Math.floor((ts-Date.now())/86400000);
-    if(d<=0) return 'now';
-    if(d===1) return 'in 1d';
-    return 'in '+d+'d';
-  }
-
-  function mkBtn(text, cls, onClick){
+  function mkBtn(text, cls, onClick, title){
     const b=document.createElement('button');
     b.className=cls;
     b.type='button';
     b.textContent=text;
+    if(title) b.title=title;
     b.addEventListener('click', onClick);
     return b;
   }
 
-  // --------- Minimal self-tests (console) ---------
-  (function tests(){
-    const assert=(name,cond)=>{(cond?console.log:console.warn)('[Test]',name,cond?'✓':'✗');};
+  // --------- Self-tests (console) ---------
+  // Off by default. Open the page with #selftest on the end of the address (or
+  // set localStorage choresDeck_selftest = '1') to run them. They run against a
+  // throwaway copy of the data with saving switched off, and the real data is
+  // re-rendered afterwards, so they can never touch your chores.
+  function shouldRunSelfTests(){
+    try{
+      const loc = String(location.hash || '') + String(location.search || '');
+      if(/selftest/i.test(loc)) return true;
+      return localStorage.getItem(LS_SELFTEST) === '1';
+    }catch(e){ return false; }
+  }
 
-    // Several tests push fixture chores into `chores` and then call code paths
-    // that render; renderAll() -> normalizeData() persists `chores` to
-    // localStorage. Snapshot up front and roll back at the end so a fixture can
-    // never survive into real data. (This is what was leaking 'Tmp Stick'.)
-    const __savedChores = JSON.parse(JSON.stringify(chores));
-    const __savedState  = JSON.parse(JSON.stringify(state));
+  function freshTestState(){
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      cycleMode: 'rolling', weeksPerCycle: 4, autoSizeWeeks: false, autoAdvance: false,
+      flexPct: DEFAULT_FLEX, cycleAssignments: {}, cycleStarts: [], cycleStartsMeta: {},
+      months: {}, open: {}, meta: {}, doneLog: []
+    };
+  }
 
-    // T1: completion persists and respects cadence
-    (function(){
-      const tmpId='__t_cadence';
-      const tmp={id:tmpId,name:'Tmp',weight:1,cadenceDays:7,tags:[],enabled:true};
-      chores.push(tmp);
-      if(!state.meta[tmpId]) state.meta[tmpId]={};
-      state.meta[tmpId].lastDoneTs = Date.now();
-      assert('T1 not due right after done', !isDueNow(tmp, Date.now()));
-      state.meta[tmpId].lastDoneTs = Date.now()-8*86400000;
-      assert('T1 due after cadence', isDueNow(tmp, Date.now()));
-      chores = chores.filter(c=>c.id!==tmpId);
-      delete state.meta[tmpId];
-    })();
+  function runSelfTests(){
+    const realChores = chores;
+    const realState = state;
+    let passed = 0, failed = 0;
+    const assert = (name, cond) => {
+      if(cond){ passed++; console.log('[Test] ✓', name); }
+      else { failed++; console.warn('[Test] ✗', name); }
+    };
 
-    // T2: open items excluded from due
-    (function(){
-      if(!chores.length) return;
-      const id=chores[0].id;
-      state.open[id]={assignedTs:Date.now(),owner:'A'};
-      const dueIds=new Set(getDueTasks().map(x=>x.id));
-      assert('T2 open excluded from due', !dueIds.has(id));
-      delete state.open[id];
-    })();
+    persistEnabled = false;
+    try{
+      chores = defaultChores.map(c => Object.assign({}, c, { id: slug(c.id), tags: (c.tags || []).slice() }));
+      state = freshTestState();
+      const H = 3600000;
 
-    // T3: exportJSON exists
-    assert('T3 exportJSON exists', typeof exportJSON==='function');
+      // T1: weekly cadence respects whole weeks
+      (function(){
+        const now = Date.now(), cur = weekStartTs(now);
+        const tmp = {id:'ztest-cad', name:'Tmp', weight:1, cadenceDays:7, tags:[], enabled:true};
+        chores.push(tmp);
+        state.meta[tmp.id] = { lastDoneTs: now };
+        assert('T1 weekly chore done now is not due this week', !isDueNow(tmp, now));
+        state.meta[tmp.id] = { lastDoneTs: addDaysTs(cur, -14) + 12*H };
+        assert('T1 weekly chore done two weeks ago is due', isDueNow(tmp, now));
+        chores = chores.filter(c => c.id !== tmp.id);
+        delete state.meta[tmp.id];
+      })();
 
-    // T4: completion log records and markNotDone clears lastDone
-    (function(){
-      const tmpId='ztest-done'; // slug-safe so normalizeData() doesn't rename it
-      chores.push({id:tmpId,name:'Tmp Done',weight:1,cadenceDays:7,tags:[],enabled:true});
-      if(!state.meta[tmpId]) state.meta[tmpId]={};
-      delete state.meta[tmpId].lastDoneTs;
-      const before = Array.isArray(state.doneLog)? state.doneLog.length : 0;
-      markDone(tmpId);
-      const after = Array.isArray(state.doneLog)? state.doneLog.length : 0;
-      assert('T4 doneLog increments', after===before+1);
-      markNotDone(tmpId);
-      const cleared = !(state.meta[tmpId] && state.meta[tmpId].lastDoneTs);
-      assert('T4 markNotDone clears lastDone', cleared);
-      chores = chores.filter(c=>c.id!==tmpId);
-      delete state.meta[tmpId]; delete state.open[tmpId];
-      state.doneLog = (state.doneLog||[]).filter(ev=>ev && ev.id!==tmpId);
-    })();
+      // T1b: the Metsi case — time of day no longer matters
+      (function(){
+        const cur = weekStartTs(Date.now());
+        const metsi = {id:'ztest-metsi1', name:'Metsi', weight:1, cadenceDays:7, tags:[], enabled:true};
+        state.meta[metsi.id] = { lastDoneTs: cur + 15*H }; // Sunday 3pm
+        assert('T1b weekly chore done Sunday afternoon is due next Sunday morning', isDueNow(metsi, addDaysTs(cur, 7) + 8*H));
+        state.meta[metsi.id] = { lastDoneTs: cur - 2*H }; // last Saturday 10pm
+        assert('T1b weekly chore done late Saturday is due Sunday morning', isDueNow(metsi, cur + 9*H));
+        delete state.meta[metsi.id];
+      })();
 
-    // T5: cycle-reset chores reset on cycle boundary
-    (function(){
-      const savedMode = state.cycleMode;
-      const savedWeeks = state.weeksPerCycle;
-      const savedAuto = state.autoSizeWeeks;
-      state.cycleMode = 'rolling';
-      state.weeksPerCycle = 4;
-      state.autoSizeWeeks = false;
+      // T2: open items excluded from due
+      (function(){
+        const id=chores[0].id;
+        state.open[id]={assignedTs:Date.now(),owner:'A',weekStart:weekStartTs(Date.now())};
+        const dueIds=new Set(getDueTasks().map(x=>x.id));
+        assert('T2 open excluded from due', !dueIds.has(id));
+        delete state.open[id];
+      })();
 
-      const now = Date.now();
-      const cycleStart = currentCycleStartTs(now);
-      const t = { id:'__t_month', cadenceDays:30, enabled:true };
+      // T3: exportJSON exists
+      assert('T3 exportJSON exists', typeof exportJSON==='function');
 
-      if(!state.meta['__t_month']) state.meta['__t_month'] = {};
-      state.meta['__t_month'].lastDoneTs = cycleStart - 1;
-      assert('T5 cycle-reset due after cycle start', isDueNow(t, now) === true);
+      // T4: completion log records and markNotDone clears lastDone
+      (function(){
+        const tmpId='ztest-done';
+        chores.push({id:tmpId,name:'Tmp Done',weight:1,cadenceDays:7,tags:[],enabled:true});
+        const before = state.doneLog.length;
+        markDone(tmpId);
+        assert('T4 doneLog increments', state.doneLog.length===before+1);
+        markNotDone(tmpId);
+        assert('T4 markNotDone clears a first-ever completion', !(state.meta[tmpId] && state.meta[tmpId].lastDoneTs));
+        chores = chores.filter(c=>c.id!==tmpId);
+        delete state.meta[tmpId]; delete state.open[tmpId];
+        state.doneLog = state.doneLog.filter(ev=>ev && ev.id!==tmpId);
+      })();
 
-      state.meta['__t_month'].lastDoneTs = cycleStart + 1;
-      assert('T5 cycle-reset not due if done this cycle', isDueNow(t, now) === false);
+      // T5: cycle-reset chores reset on cycle boundary
+      (function(){
+        const now = Date.now();
+        const cycleStart = currentCycleStartTs(now);
+        const t = { id:'ztest-month', cadenceDays:30, enabled:true };
+        state.meta[t.id] = { lastDoneTs: cycleStart - 1 };
+        assert('T5 cycle-reset due after cycle start', isDueNow(t, now) === true);
+        state.meta[t.id] = { lastDoneTs: cycleStart + 1 };
+        assert('T5 cycle-reset not due if done this cycle', isDueNow(t, now) === false);
+        delete state.meta[t.id];
+      })();
 
-      delete state.meta['__t_month'];
-      state.cycleMode = savedMode;
-      state.weeksPerCycle = savedWeeks;
-      state.autoSizeWeeks = savedAuto;
-    })();
+      // T6: rolling cycle length = weeksPerCycle * 7 days
+      (function(){
+        const savedStarts = state.cycleStarts.slice();
+        const now = Date.now();
+        const cs = currentCycleStartTs(now);
+        const ne = nextCycleStartTs(cs);
+        assert('T6 rolling 4w cycle projects 28 days', Math.round((ne - cs) / MS_DAY) === 28);
+        assert('T6 rolling seed lands on a Sunday at midnight', new Date(rollingCycleStartTs(now, 4)).getDay() === 0 && new Date(rollingCycleStartTs(now, 4)).getHours() === 0);
+        assert('T6 active cycle covers now', now >= cs && now < ne);
+        state.weeksPerCycle = 2;
+        state.cycleStarts = [];
+        const cs2 = currentCycleStartTs(now);
+        const ne2 = nextCycleStartTs(cs2);
+        assert('T6 rolling 2w cycle projects 14 days', Math.round((ne2-cs2)/MS_DAY) === 14);
+        state.weeksPerCycle = 4;
+        state.cycleStarts = savedStarts;
+      })();
 
-    // T6: rolling cycle length = weeksPerCycle * 7 days
-    (function(){
-      const savedMode = state.cycleMode;
-      const savedWeeks = state.weeksPerCycle;
-      const savedAuto = state.autoSizeWeeks;
-      state.cycleMode = 'rolling';
-      state.weeksPerCycle = 4;
-      state.autoSizeWeeks = false;
+      // T7: owner stickiness
+      (function(){
+        const tmpId='ztest-owner';
+        chores.push({id:tmpId,name:'Tmp Owner',weight:1,cadenceDays:7,tags:[],enabled:true});
+        assert('T7 no owner initially', getOwnerForTask(tmpId) === '');
+        recordCycleOwner(tmpId, 'Adam');
+        assert('T7 sticky owner after recordCycleOwner', getOwnerForTask(tmpId) === 'Adam');
+        state.open[tmpId] = { assignedTs: Date.now(), owner: 'Hannah', weekStart: weekStartTs(Date.now()) };
+        assert('T7 outstanding owner wins', getOwnerForTask(tmpId) === 'Hannah');
+        delete state.open[tmpId];
+        delete getCurrentCycleBucket()[tmpId];
+        chores = chores.filter(c=>c.id!==tmpId);
+      })();
 
-      const now = Date.now();
-      const cs = currentCycleStartTs(now);
-      const ne = nextCycleStartTs(cs);
-      const lengthDays = Math.round((ne - cs) / MS_DAY);
-      assert('T6 rolling 4w cycle projects 28 days', lengthDays === 28);
-      assert('T6 rolling seed lands on a Sunday', new Date(rollingCycleStartTs(now, 4)).getDay() === 0);
-      assert('T6 active cycle covers now', now >= cs && now < ne);
+      // T8: assignBatch stamps the week and records a sticky owner
+      (function(){
+        const tmpId='ztest-stick';
+        chores.push({id:tmpId,name:'Tmp Stick',weight:1,cadenceDays:7,tags:[],enabled:true});
+        const mk = monthKey();
+        const before = (state.months[mk] && state.months[mk].history) ? state.months[mk].history.length : 0;
+        assignBatch([{id:tmpId,name:'Tmp Stick',weight:1,owner:'Adam'}], false);
+        const hist = state.months[mk].history;
+        assert('T8 assignBatch appends history', hist.length === before+1);
+        const cur = weekStartTs(Date.now());
+        assert('T8 batch is stamped with this week', hist[hist.length-1].weekStart === cur);
+        assert('T8 open assignment is stamped with this week', !!state.open[tmpId] && state.open[tmpId].weekStart === cur);
+        assert('T8 sticky owner recorded by assignBatch', getOwnerForTask(tmpId) === 'Adam');
+        markDone(tmpId);
+        const bucket = getCurrentCycleBucket();
+        assert('T8 sticky owner survives markDone', bucket[tmpId] === 'Adam');
+        chores = chores.filter(c=>c.id!==tmpId);
+        delete state.meta[tmpId]; delete state.open[tmpId]; delete bucket[tmpId];
+        state.doneLog = state.doneLog.filter(ev=>ev && ev.id!==tmpId);
+        state.months[mk].history = state.months[mk].history.filter(h => !(h.items||[]).some(it => it.id === tmpId));
+      })();
 
-      state.weeksPerCycle = 2;
-      const cs2 = currentCycleStartTs(now);
-      const ne2 = nextCycleStartTs(cs2);
-      assert('T6 rolling 2w cycle projects 14 days', Math.round((ne2-cs2)/MS_DAY) === 14);
+      // T9: pickWeeklySet produces varied subsets across repeated draws
+      (function(){
+        const pool = [
+          {id:'z1',name:'Z1',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
+          {id:'z2',name:'Z2',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
+          {id:'z3',name:'Z3',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
+          {id:'z4',name:'Z4',weight:2,  cadenceDays:30,enabled:true,tags:[]},
+          {id:'z5',name:'Z5',weight:0.5,cadenceDays:30,enabled:true,tags:[]},
+          {id:'z6',name:'Z6',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
+          {id:'z7',name:'Z7',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
+          {id:'z8',name:'Z8',weight:1,  cadenceDays:30,enabled:true,tags:[]},
+          {id:'z9',name:'Z9',weight:2,  cadenceDays:30,enabled:true,tags:[]},
+          {id:'z10',name:'Z10',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
+        ];
+        const keys = new Set();
+        for(let i=0;i<10;i++){
+          const s = pickWeeklySet(pool, 8, ['Adam','Hannah']);
+          keys.add(s.map(x=>x.id).sort().join('|'));
+        }
+        assert('T9 pickWeeklySet varies across draws (>=3 distinct)', keys.size >= 3);
+      })();
 
-      state.cycleMode = savedMode;
-      state.weeksPerCycle = savedWeeks;
-      state.autoSizeWeeks = savedAuto;
-    })();
+      // T10: fairAssign stays balanced and varies
+      (function(){
+        const testIds = ['zrot1','zrot2','zrot3','zrot4'];
+        for(const id of testIds){
+          chores.push({id,name:id.toUpperCase(),weight:2,cadenceDays:30,enabled:true,tags:[]});
+        }
+        const before = state.doneLog.length;
+        const nowT = Date.now();
+        for(const id of testIds){
+          state.doneLog.push({ts:nowT, id, name:id, weight:2, owner:'Adam'});
+        }
+        const items = testIds.map(id => ({id,name:id.toUpperCase(),weight:2}));
+        const seenAssigns = new Set();
+        let balancedCount = 0;
+        for(let i=0;i<10;i++){
+          const out = fairAssign(items, ['Adam','Hannah']);
+          const adamW = out.filter(x=>x.owner==='Adam').reduce((s,x)=>s+x.weight,0);
+          const hanW  = out.filter(x=>x.owner==='Hannah').reduce((s,x)=>s+x.weight,0);
+          if(Math.abs(adamW - hanW) <= WEEK_TOL) balancedCount++;
+          seenAssigns.add(out.map(x=>x.owner).join('|'));
+        }
+        assert('T10 fairAssign keeps balance (≤0.5 diff) across all draws', balancedCount === 10);
+        assert('T10 fairAssign varies assignment across draws (>=2 distinct)', seenAssigns.size >= 2);
+        chores = chores.filter(c => !testIds.includes(c.id));
+        state.doneLog = state.doneLog.slice(0, before);
+      })();
 
-    // T7: owner stickiness — recordCycleOwner makes getOwnerForTask return it
-    (function(){
-      const tmpId='__t_owner';
-      chores.push({id:tmpId,name:'Tmp Owner',weight:1,cadenceDays:7,tags:[],enabled:true});
-      assert('T7 no owner initially', getOwnerForTask(tmpId) === '');
-      recordCycleOwner(tmpId, 'Adam');
-      assert('T7 sticky owner after recordCycleOwner', getOwnerForTask(tmpId) === 'Adam');
-      state.open[tmpId] = { assignedTs: Date.now(), owner: 'Hannah' };
-      assert('T7 outstanding owner wins', getOwnerForTask(tmpId) === 'Hannah');
-      delete state.open[tmpId];
-      const bucket = getCurrentCycleBucket();
-      delete bucket[tmpId];
-      chores = chores.filter(c=>c.id!==tmpId);
-    })();
+      // T11: rotation preferred when strictly better than the status quo
+      (function(){
+        const testIds = ['zrec1','zrec2'];
+        for(const id of testIds){
+          chores.push({id,name:id.toUpperCase(),weight:1,cadenceDays:30,enabled:true,tags:[]});
+        }
+        const before = state.doneLog.length;
+        const nowT = Date.now();
+        state.doneLog.push({ts:nowT-1000, id:'zrec1', name:'ZREC1', weight:1, owner:'Adam'});
+        state.doneLog.push({ts:nowT, id:'zrec2', name:'ZREC2', weight:1, owner:'Hannah'});
+        const items = [{id:'zrec1',name:'ZREC1',weight:1},{id:'zrec2',name:'ZREC2',weight:1}];
+        let allRotated = true;
+        for(let i=0;i<10;i++){
+          const out = fairAssign(items, ['Adam','Hannah']);
+          const a = out.find(x=>x.id==='zrec1');
+          const b = out.find(x=>x.id==='zrec2');
+          if(!(a.owner === 'Hannah' && b.owner === 'Adam')){ allRotated = false; break; }
+        }
+        assert('T11 fairAssign rotates when strictly better than status quo', allRotated);
+        chores = chores.filter(c => !testIds.includes(c.id));
+        state.doneLog = state.doneLog.slice(0, before);
+      })();
 
-    // T8: assignBatch records sticky owner; survives markDone in the same cycle
-    (function(){
-      const tmpId='ztest-stick';
-      chores.push({id:tmpId,name:'Tmp Stick',weight:1,cadenceDays:7,tags:[],enabled:true});
-      const before = (state.months[monthKey()] && state.months[monthKey()].history) ? state.months[monthKey()].history.length : 0;
-      assignBatch([{id:tmpId,name:'Tmp Stick',weight:1,owner:'Adam'}], false);
-      const after = (state.months[monthKey()] && state.months[monthKey()].history) ? state.months[monthKey()].history.length : 0;
-      assert('T8 assignBatch appends history', after === before+1);
-      assert('T8 sticky owner recorded by assignBatch', getOwnerForTask(tmpId) === 'Adam');
-      markDone(tmpId);
-      const bucket = getCurrentCycleBucket();
-      assert('T8 sticky owner survives markDone', bucket[tmpId] === 'Adam');
-      chores = chores.filter(c=>c.id!==tmpId);
-      delete state.meta[tmpId]; delete state.open[tmpId]; delete bucket[tmpId];
-      state.doneLog = (state.doneLog||[]).filter(ev=>ev && ev.id!==tmpId);
-      const mm = state.months[monthKey()];
-      if(mm && mm.history){
-        mm.history = mm.history.filter(h => !(h.items||[]).some(it => it.id === tmpId));
-      }
-    })();
+      // T12: minSplitDiff correctness
+      assert('T12 minSplitDiff([2,2]) === 0', minSplitDiff([{weight:2},{weight:2}]) === 0);
+      assert('T12 minSplitDiff([1,2,3]) === 0', minSplitDiff([{weight:1},{weight:2},{weight:3}]) === 0);
+      assert('T12 minSplitDiff([1,1,1]) === 1', minSplitDiff([{weight:1},{weight:1},{weight:1}]) === 1);
 
-    // T9: pickWeeklySet produces varied subsets across repeated draws
-    (function(){
-      const pool = [
-        {id:'z1',name:'Z1',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
-        {id:'z2',name:'Z2',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
-        {id:'z3',name:'Z3',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
-        {id:'z4',name:'Z4',weight:2,  cadenceDays:30,enabled:true,tags:[]},
-        {id:'z5',name:'Z5',weight:0.5,cadenceDays:30,enabled:true,tags:[]},
-        {id:'z6',name:'Z6',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
-        {id:'z7',name:'Z7',weight:2.5,cadenceDays:30,enabled:true,tags:[]},
-        {id:'z8',name:'Z8',weight:1,  cadenceDays:30,enabled:true,tags:[]},
-        {id:'z9',name:'Z9',weight:2,  cadenceDays:30,enabled:true,tags:[]},
-        {id:'z10',name:'Z10',weight:1.5,cadenceDays:30,enabled:true,tags:[]},
-      ];
-      const keys = new Set();
-      for(let i=0;i<10;i++){
-        const s = pickWeeklySet(pool, 8, ['Adam','Hannah']);
-        keys.add(s.map(x=>x.id).sort().join('|'));
-      }
-      assert('T9 pickWeeklySet varies across draws (>=3 distinct)', keys.size >= 3);
-    })();
+      // T13: getAllBatchesFlat aggregates across months and sorts newest first
+      (function(){
+        state.months['9999-01'] = { history: [{ ts: 1000, items: [], total: 0 }, { ts: 3000, items: [], total: 0 }]};
+        state.months['9999-02'] = { history: [{ ts: 2000, items: [], total: 0 }]};
+        const ours = getAllBatchesFlat().filter(b => b.ts === 1000 || b.ts === 2000 || b.ts === 3000);
+        assert('T13 getAllBatchesFlat aggregates across months', ours.length === 3);
+        assert('T13 getAllBatchesFlat sorts newest-first', ours[0].ts === 3000 && ours[1].ts === 2000 && ours[2].ts === 1000);
+        delete state.months['9999-01'];
+        delete state.months['9999-02'];
+      })();
 
-    // T10: fairAssign stays balanced and varies
-    (function(){
-      const testIds = ['zrot1','zrot2','zrot3','zrot4'];
-      for(const id of testIds){
-        chores.push({id,name:id.toUpperCase(),weight:2,cadenceDays:30,enabled:true,tags:[]});
-      }
-      if(!Array.isArray(state.doneLog)) state.doneLog=[];
-      const before = state.doneLog.length;
-      const nowT = Date.now();
-      for(const id of testIds){
-        state.doneLog.push({ts:nowT, id, name:id, weight:2, owner:'Adam'});
-      }
-      const items = testIds.map(id => ({id,name:id.toUpperCase(),weight:2}));
-      const seenAssigns = new Set();
-      let balancedCount = 0;
-      for(let i=0;i<10;i++){
-        const out = fairAssign(items, ['Adam','Hannah']);
-        const adamW = out.filter(x=>x.owner==='Adam').reduce((s,x)=>s+x.weight,0);
-        const hanW  = out.filter(x=>x.owner==='Hannah').reduce((s,x)=>s+x.weight,0);
-        if(Math.abs(adamW - hanW) <= WEEK_TOL) balancedCount++;
-        seenAssigns.add(out.map(x=>x.owner).join('|'));
-      }
-      assert('T10 fairAssign keeps balance (≤0.5 diff) across all draws', balancedCount === 10);
-      assert('T10 fairAssign varies assignment across draws (>=2 distinct)', seenAssigns.size >= 2);
+      // T14: groupBatches by cycle splits on the boundary
+      (function(){
+        const cs = currentCycleStartTs(Date.now());
+        const batches = [
+          { ts: cs + 100, items: [], total: 0 },
+          { ts: cs + 1000000, items: [], total: 0 },
+          { ts: cs - 1000, items: [], total: 0 },
+        ];
+        const groups = groupBatches(batches, 'cycle');
+        assert('T14 groupBatches by cycle produces 2 groups', groups.length === 2);
+        assert('T14 newest cycle group has 2 batches', groups[0].batches.length === 2);
+        assert('T14 older cycle group has 1 batch', groups[1].batches.length === 1);
+      })();
 
-      chores = chores.filter(c => !testIds.includes(c.id));
-      state.doneLog = state.doneLog.slice(0, before);
-    })();
+      // T15: groupBatches by month and by week
+      (function(){
+        const b1 = { ts: new Date(2024, 0, 15).getTime(), items: [], total: 0 };
+        const b2 = { ts: new Date(2024, 0, 25).getTime(), items: [], total: 0 };
+        const b3 = { ts: new Date(2024, 1, 10).getTime(), items: [], total: 0 };
+        const groups = groupBatches([b1,b2,b3], 'month');
+        assert('T15 groupBatches by month produces 2 groups', groups.length === 2);
+        const jan = groups.find(g => g.batches.some(x => x.ts === b1.ts));
+        assert('T15 January group contains both January batches', jan && jan.batches.length === 2);
+        const sun = new Date(2024, 0, 14).getTime();     // a Sunday
+        const tue = addDaysTs(sun, 2) + 15*H;             // Tuesday, same week
+        const nextSun = addDaysTs(sun, 7) + 9*H;          // the following Sunday
+        const wg = groupBatches([{ts:sun+10*H, items:[], total:0}, {ts:tue, items:[], total:0}, {ts:nextSun, items:[], total:0}], 'week');
+        assert('T15 a Tuesday draw groups with that Sunday\'s week', wg.length === 2 && wg.some(g => g.batches.length === 2));
+      })();
 
-    // T11: rotation preferred when strictly better than the status quo
-    (function(){
-      const testIds = ['zrec1','zrec2'];
-      for(const id of testIds){
-        chores.push({id,name:id.toUpperCase(),weight:1,cadenceDays:30,enabled:true,tags:[]});
-      }
-      if(!Array.isArray(state.doneLog)) state.doneLog=[];
-      const before = state.doneLog.length;
-      const nowT = Date.now();
-      state.doneLog.push({ts:nowT-1000, id:'zrec1', name:'ZREC1', weight:1, owner:'Adam'});
-      state.doneLog.push({ts:nowT, id:'zrec2', name:'ZREC2', weight:1, owner:'Hannah'});
+      // T16: groupBatches with 'none' returns a single group containing all
+      (function(){
+        const groups = groupBatches([{ ts: 100, items: [], total: 0 },{ ts: 200, items: [], total: 0 }], 'none');
+        assert('T16 groupBatches none returns 1 group', groups.length === 1);
+        assert('T16 groupBatches none has all batches', groups[0].batches.length === 2);
+      })();
 
-      const items = [
-        {id:'zrec1',name:'ZREC1',weight:1},
-        {id:'zrec2',name:'ZREC2',weight:1},
-      ];
-      let allRotated = true;
-      for(let i=0;i<10;i++){
-        const out = fairAssign(items, ['Adam','Hannah']);
-        const a = out.find(x=>x.id==='zrec1');
-        const b = out.find(x=>x.id==='zrec2');
-        if(!(a.owner === 'Hannah' && b.owner === 'Adam')){ allRotated = false; break; }
-      }
-      assert('T11 fairAssign rotates when strictly better than status quo', allRotated);
+      // T17: assignBatch is the ONLY thing that persists a draw
+      (function(){
+        const m = monthKey();
+        if(!state.months[m]) state.months[m] = { history: [] };
+        const before = state.months[m].history.length;
+        const testChores = [
+          {id:'zroll1',name:'Zroll1',weight:2,cadenceDays:30,enabled:true,tags:[]},
+          {id:'zroll2',name:'Zroll2',weight:2,cadenceDays:30,enabled:true,tags:[]},
+          {id:'zroll3',name:'Zroll3',weight:1,cadenceDays:30,enabled:true,tags:[]},
+        ];
+        for(let i=0;i<3;i++) fairAssign(pickWeeklySet(testChores, 8, ['Adam','Hannah']), ['Adam','Hannah']);
+        assert('T17 pick/assign without assignBatch does NOT persist', state.months[m].history.length === before);
+      })();
 
-      chores = chores.filter(c => !testIds.includes(c.id));
-      state.doneLog = state.doneLog.slice(0, before);
-    })();
-
-    // T12: minSplitDiff correctness
-    (function(){
-      const items1 = [{weight:2},{weight:2}];
-      assert('T12 minSplitDiff([2,2]) === 0', minSplitDiff(items1) === 0);
-      const items2 = [{weight:1},{weight:2},{weight:3}];
-      assert('T12 minSplitDiff([1,2,3]) === 0', minSplitDiff(items2) === 0);
-      const items3 = [{weight:1},{weight:1},{weight:1}];
-      assert('T12 minSplitDiff([1,1,1]) === 1', minSplitDiff(items3) === 1);
-    })();
-
-    // T13: getAllBatchesFlat aggregates across months and sorts newest first
-    (function(){
-      const mkA = '9999-01', mkB = '9999-02';
-      const savedA = state.months[mkA];
-      const savedB = state.months[mkB];
-      state.months[mkA] = { history: [
-        { ts: 1000, items: [], total: 0 },
-        { ts: 3000, items: [], total: 0 },
-      ]};
-      state.months[mkB] = { history: [
-        { ts: 2000, items: [], total: 0 },
-      ]};
-      const flat = getAllBatchesFlat();
-      const ours = flat.filter(b => b.ts === 1000 || b.ts === 2000 || b.ts === 3000);
-      assert('T13 getAllBatchesFlat aggregates across months', ours.length === 3);
-      assert('T13 getAllBatchesFlat sorts newest-first', ours[0].ts === 3000 && ours[1].ts === 2000 && ours[2].ts === 1000);
-      if(savedA === undefined) delete state.months[mkA]; else state.months[mkA] = savedA;
-      if(savedB === undefined) delete state.months[mkB]; else state.months[mkB] = savedB;
-    })();
-
-    // T14: groupBatches by cycle splits on the boundary
-    (function(){
-      const savedMode = state.cycleMode;
-      const savedWeeks = state.weeksPerCycle;
-      const savedAuto = state.autoSizeWeeks;
-      state.cycleMode = 'rolling';
-      state.weeksPerCycle = 4;
-      state.autoSizeWeeks = false;
-
-      const now = Date.now();
-      const cs = currentCycleStartTs(now);
-      const batches = [
-        { ts: cs + 100, items: [], total: 0 },
-        { ts: cs + 1000000, items: [], total: 0 },
-        { ts: cs - 1000, items: [], total: 0 },
-      ];
-      const groups = groupBatches(batches, 'cycle');
-      assert('T14 groupBatches by cycle produces 2 groups', groups.length === 2);
-      assert('T14 groupBatches newest group has 2 batches', groups[0].batches.length === 2);
-      assert('T14 groupBatches older group has 1 batch', groups[1].batches.length === 1);
-
-      state.cycleMode = savedMode;
-      state.weeksPerCycle = savedWeeks;
-      state.autoSizeWeeks = savedAuto;
-    })();
-
-    // T15: groupBatches by month uses YYYY-MM key from timestamp
-    (function(){
-      const b1 = { ts: new Date(2024, 0, 15).getTime(), items: [], total: 0 };
-      const b2 = { ts: new Date(2024, 0, 25).getTime(), items: [], total: 0 };
-      const b3 = { ts: new Date(2024, 1, 10).getTime(), items: [], total: 0 };
-      const groups = groupBatches([b1,b2,b3], 'month');
-      assert('T15 groupBatches by month produces 2 groups', groups.length === 2);
-      const jan = groups.find(g => g.batches.some(x => x.ts === b1.ts));
-      assert('T15 January group contains both January batches', jan && jan.batches.length === 2);
-    })();
-
-    // T16: groupBatches with 'none' returns a single group containing all
-    (function(){
-      const batches = [
-        { ts: 100, items: [], total: 0 },
-        { ts: 200, items: [], total: 0 },
-      ];
-      const groups = groupBatches(batches, 'none');
-      assert('T16 groupBatches none returns 1 group', groups.length === 1);
-      assert('T16 groupBatches none has all batches', groups[0].batches.length === 2);
-    })();
-
-    // T17: assignBatch is the ONLY thing that persists a draw
-    (function(){
-      const m = monthKey();
-      if(!state.months[m]) state.months[m] = { history: [] };
-      const before = state.months[m].history.length;
-      const testChores = [
-        {id:'zroll1',name:'Zroll1',weight:2,cadenceDays:30,enabled:true,tags:[]},
-        {id:'zroll2',name:'Zroll2',weight:2,cadenceDays:30,enabled:true,tags:[]},
-        {id:'zroll3',name:'Zroll3',weight:1,cadenceDays:30,enabled:true,tags:[]},
-      ];
-      const p1 = pickWeeklySet(testChores, 8, ['Adam','Hannah']);
-      fairAssign(p1, ['Adam','Hannah']);
-      const p2 = pickWeeklySet(testChores, 8, ['Adam','Hannah']);
-      fairAssign(p2, ['Adam','Hannah']);
-      const p3 = pickWeeklySet(testChores, 8, ['Adam','Hannah']);
-      fairAssign(p3, ['Adam','Hannah']);
-      const after = state.months[m].history.length;
-      assert('T17 pick/assign without assignBatch does NOT persist', after === before);
-    })();
-
-    // T18: an early cycle unsticks a fully-completed cycle
-    (function(){
-      const savedStarts = state.cycleStarts.slice();
-      const savedStartsMeta = Object.assign({}, state.cycleStartsMeta || {});
-      const savedOpen = JSON.parse(JSON.stringify(state.open || {}));
-      const savedAssign = JSON.parse(JSON.stringify(state.cycleAssignments || {}));
-      const savedCst = state.cycleStartTs;
-      const savedMode = state.cycleMode;
-      const savedWeeks = state.weeksPerCycle;
-      const savedAuto = state.autoSizeWeeks;
-      state.cycleMode = 'rolling';
-      state.weeksPerCycle = 4;
-      state.autoSizeWeeks = false;
-
-      const now = Date.now();
-      const before = currentCycleStartTs(now);
-      const tmp = { id:'__t_early', cadenceDays:30, enabled:true };
-      // Completed a moment ago: not due under the current cycle
-      state.meta['__t_early'] = { lastDoneTs: now - 1000 };
-      assert('T18 completed cycle-reset chore is not due', isDueNow(tmp, now) === false);
-
-      const candidate = candidateBoundary(now);
-      assert('T18 candidate boundary lands after the completion', candidate > (now - 1000));
-      assert('T18 a new cycle would unlock it', isDueNow(tmp, now, candidate) === true);
-
-      const nb = startNewCycle(now, 'manual');
-      assert('T18 startNewCycle moves the boundary forward', nb > before && currentCycleStartTs() === nb);
-      assert('T18 chore is due again in the new cycle', isDueNow(tmp, Date.now()) === true);
-
-      delete state.meta['__t_early'];
-      state.cycleStarts = savedStarts;
-      state.cycleStartsMeta = savedStartsMeta;
-      state.open = savedOpen;
-      state.cycleAssignments = savedAssign;
-      state.cycleStartTs = savedCst;
-      state.cycleMode = savedMode;
-      state.weeksPerCycle = savedWeeks;
-      state.autoSizeWeeks = savedAuto;
-    })();
-
-    // T19: workload sizing math, including flex room
-    (function(){
+      // T19: workload sizing math, including flex room
       assert('T19 42.5 wt at cap 8 with 25% flex = 8 weeks', weeksForWorkload(42.5, 8, 0.25) === 8);
       assert('T19 42.5 wt at cap 8 with no flex = 6 weeks', weeksForWorkload(42.5, 8, 0) === 6);
       assert('T19 flex lengthens the cycle', weeksForWorkload(20, 10, 0.5) > weeksForWorkload(20, 10, 0));
       assert('T19 empty workload is 1 week', weeksForWorkload(0, 8, 0.25) === 1);
       assert('T19 sizing is capped', weeksForWorkload(9999, 1, 0.5) === MAX_WEEKS);
-    })();
 
-    // T20: cycleStartForTs buckets against recorded boundaries
-    (function(){
-      const savedStarts = state.cycleStarts.slice();
-      state.cycleStarts = [1000, 5000, 9000];
-      assert('T20 finds the containing boundary', cycleStartForTs(6000) === 5000);
-      assert('T20 an exact boundary is its own cycle', cycleStartForTs(9000) === 9000);
-      assert('T20 projects backwards before the first boundary', cycleStartForTs(500) < 1000);
-      assert('T20 nextCycleStartTs uses the recorded list', nextCycleStartTs(5000) === 9000);
-      state.cycleStarts = savedStarts;
-    })();
+      // T20: cycleStartForTs buckets against recorded boundaries
+      (function(){
+        const savedStarts = state.cycleStarts.slice();
+        state.cycleStarts = [1000, 5000, 9000];
+        assert('T20 finds the containing boundary', cycleStartForTs(6000) === 5000);
+        assert('T20 an exact boundary is its own cycle', cycleStartForTs(9000) === 9000);
+        assert('T20 projects backwards before the first boundary', cycleStartForTs(500) < 1000);
+        assert('T20 nextCycleStartTs uses the recorded list', nextCycleStartTs(5000) === 9000);
+        state.cycleStarts = savedStarts;
+      })();
 
-    // T21: overdueRatio measures lateness against each chore's own cadence
-    (function(){
-      const savedMode=state.cycleMode, savedWeeks=state.weeksPerCycle, savedAuto=state.autoSizeWeeks;
-      state.cycleMode='rolling'; state.weeksPerCycle=4; state.autoSizeWeeks=false; // cycle-reset cutoff = 26d
-      const now = Date.now();
-      const quick = {id:'ztest-quick', name:'Quick', weight:0.5, cadenceDays:7,  tags:[], enabled:true};
-      const slow  = {id:'ztest-slow',  name:'Slow',  weight:2.5, cadenceDays:14, tags:[], enabled:true};
-      assert('T21 fixtures use the cadence branch', !isCycleReset(quick) && !isCycleReset(slow));
-      state.meta['ztest-quick'] = { lastDoneTs: now - 21*MS_DAY }; // 14d late on 7d  -> ~2.0
-      state.meta['ztest-slow']  = { lastDoneTs: now - 18*MS_DAY }; //  4d late on 14d -> ~0.29
-      assert('T21 a 7d chore 14d late scores ~2', Math.abs(overdueRatio(quick, now) - 2) < 0.05);
-      assert('T21 a 14d chore 4d late scores <0.5', overdueRatio(slow, now) < 0.5);
-      assert('T21 short cadence outranks long cadence', overdueRatio(quick, now) > overdueRatio(slow, now));
-      state.meta['ztest-quick'] = { lastDoneTs: now - 3*MS_DAY };
-      assert('T21 a chore inside its cadence is not due', overdueRatio(quick, now) < 0);
-      const cyc = {id:'ztest-cyc', name:'Cyc', weight:1, cadenceDays:30, tags:[], enabled:true};
-      assert('T21 a 30d chore is cycle-reset at 4 weeks', isCycleReset(cyc));
-      state.meta['ztest-cyc'] = { lastDoneTs: currentCycleStartTs(now) + 1000 };
-      assert('T21 cycle-reset chore done this cycle is not due', overdueRatio(cyc, now) === -1);
-      delete state.meta['ztest-quick']; delete state.meta['ztest-slow']; delete state.meta['ztest-cyc'];
-      state.cycleMode=savedMode; state.weeksPerCycle=savedWeeks; state.autoSizeWeeks=savedAuto;
-    })();
+      // T21: overdueRatio counts whole weeks against each chore's own cadence
+      (function(){
+        const now = Date.now(), cur = weekStartTs(now);
+        const quick = {id:'ztest-quick', name:'Quick', weight:0.5, cadenceDays:7,  tags:[], enabled:true};
+        const slow  = {id:'ztest-slow',  name:'Slow',  weight:2.5, cadenceDays:14, tags:[], enabled:true};
+        assert('T21 fixtures use the cadence branch', !isCycleReset(quick) && !isCycleReset(slow));
+        const threeWeeksAgoMonday = addDaysTs(cur, -20) + 12*H;
+        state.meta[quick.id] = { lastDoneTs: threeWeeksAgoMonday };
+        state.meta[slow.id]  = { lastDoneTs: threeWeeksAgoMonday };
+        assert('T21 weekly chore two weeks late scores 2', Math.abs(overdueRatio(quick, now) - 2) < 1e-9);
+        assert('T21 14-day chore one week late scores 0.5', Math.abs(overdueRatio(slow, now) - 0.5) < 1e-9);
+        assert('T21 short cadence outranks long cadence', overdueRatio(quick, now) > overdueRatio(slow, now));
+        state.meta[quick.id] = { lastDoneTs: now };
+        assert('T21 a chore inside its cadence scores below 0', overdueRatio(quick, now) < 0);
+        const cyc = {id:'ztest-cyc', name:'Cyc', weight:1, cadenceDays:30, tags:[], enabled:true};
+        assert('T21 a 30d chore is cycle-reset at 4 weeks', isCycleReset(cyc));
+        state.meta[cyc.id] = { lastDoneTs: currentCycleStartTs(now) + 1000 };
+        assert('T21 cycle-reset chore done this cycle scores -1', overdueRatio(cyc, now) === -1);
+        delete state.meta[quick.id]; delete state.meta[slow.id]; delete state.meta[cyc.id];
+      })();
 
-    // T22: the promise tier puts the most-overdue chore in EVERY draw,
-    //      while the rest of the week still varies
-    (function(){
-      const savedMode=state.cycleMode, savedWeeks=state.weeksPerCycle, savedAuto=state.autoSizeWeeks;
-      state.cycleMode='rolling'; state.weeksPerCycle=4; state.autoSizeWeeks=false;
-      const now = Date.now();
-      const pool = [];
-      for(let i=1;i<=10;i++){
-        const id='ztest-p'+i;
-        pool.push({id, name:'P'+i, weight: i===1?0.5:2, cadenceDays: i===1?7:14, tags:[], enabled:true});
-        // Everyone is a little late; P1 is very late relative to its 7d cadence.
-        state.meta[id] = { lastDoneTs: now - (i===1 ? 28*MS_DAY : 18*MS_DAY) };
-      }
-      let hits=0, overCap=0; const keys=new Set();
-      for(let i=0;i<25;i++){
-        const s = pickWeeklySet(pool, 8, ['Adam','Hannah']);
-        if(s.some(x=>x.id==='ztest-p1')) hits++;
-        if(s.reduce((a,x)=>a+(x.weight||0),0) > 8 + 1e-9) overCap++;
-        keys.add(s.map(x=>x.id).sort().join('|'));
-      }
-      assert('T22 the most-overdue chore is in every draw', hits === 25);
-      assert('T22 the rest of the week still varies (>=3 distinct)', keys.size >= 3);
-      assert('T22 every draw respects the cap', overCap === 0);
-      for(let i=1;i<=10;i++) delete state.meta['ztest-p'+i];
-      state.cycleMode=savedMode; state.weeksPerCycle=savedWeeks; state.autoSizeWeeks=savedAuto;
-    })();
+      // T22: a due weekly chore makes EVERY draw, even when others are later
+      (function(){
+        const now = Date.now(), cur = weekStartTs(now);
+        const pool = [];
+        for(let i=1;i<=10;i++){
+          const id='ztest-p'+i;
+          const weekly = (i===1);
+          pool.push({id, name:'P'+i, weight: weekly?0.5:2, cadenceDays: weekly?7:14, tags:[], enabled:true});
+          state.meta[id] = { lastDoneTs: weekly ? addDaysTs(cur, -5) + 12*H : addDaysTs(cur, -20) + 12*H };
+        }
+        assert('T22 the weekly chore is the least overdue', overdueRatio(pool[0], now) < overdueRatio(pool[1], now));
+        let hits=0, overCap=0; const keys=new Set();
+        for(let i=0;i<25;i++){
+          const s = pickWeeklySet(pool, 8, ['Adam','Hannah']);
+          if(s.some(x=>x.id==='ztest-p1')) hits++;
+          if(s.reduce((a,x)=>a+(x.weight||0),0) > 8 + 1e-9) overCap++;
+          keys.add(s.map(x=>x.id).sort().join('|'));
+        }
+        assert('T22 a due weekly chore is in every draw', hits === 25);
+        assert('T22 the rest of the week still varies (>=3 distinct)', keys.size >= 3);
+        assert('T22 every draw respects the cap', overCap === 0);
+        for(let i=1;i<=10;i++) delete state.meta['ztest-p'+i];
+      })();
 
-    // T23: near-identical lateness shuffles instead of locking in
-    (function(){
-      const savedMode=state.cycleMode, savedWeeks=state.weeksPerCycle, savedAuto=state.autoSizeWeeks;
-      state.cycleMode='rolling'; state.weeksPerCycle=4; state.autoSizeWeeks=false;
-      const now = Date.now();
-      const pool = [];
-      for(let i=1;i<=8;i++){
-        const id='ztest-q'+i;
-        pool.push({id, name:'Q'+i, weight:1.5, cadenceDays:14, tags:[], enabled:true});
-        // All late by within a few minutes of each other: a strict sort would
-        // pin the same ones every week; bucketing must shuffle them.
-        state.meta[id] = { lastDoneTs: now - 14*MS_DAY - i*60000 };
-      }
-      const seenFirst = new Set();
-      for(let i=0;i<40;i++){
-        const tier = promiseTier(pool, 8, now);
-        if(tier.length) seenFirst.add(tier[0].id);
-      }
-      assert('T23 indistinguishable lateness rotates (>=4 different leaders)', seenFirst.size >= 4);
-      for(let i=1;i<=8;i++) delete state.meta['ztest-q'+i];
-      state.cycleMode=savedMode; state.weeksPerCycle=savedWeeks; state.autoSizeWeeks=savedAuto;
-    })();
+      // T23: equal lateness shuffles instead of locking in
+      (function(){
+        const now = Date.now(), cur = weekStartTs(now);
+        const pool = [];
+        for(let i=1;i<=8;i++){
+          const id='ztest-q'+i;
+          pool.push({id, name:'Q'+i, weight:1.5, cadenceDays:14, tags:[], enabled:true});
+          state.meta[id] = { lastDoneTs: addDaysTs(cur, -20) + 12*H - i*60000 };
+        }
+        const seenFirst = new Set();
+        for(let i=0;i<40;i++){
+          const tier = promiseTier(pool, 4, now);
+          if(tier.length) seenFirst.add(tier[0].id);
+        }
+        assert('T23 equally-late chores rotate (>=4 different leaders)', seenFirst.size >= 4);
+        for(let i=1;i<=8;i++) delete state.meta['ztest-q'+i];
+      })();
 
-    // T24: PROMISE_RESERVE leaves room for the lottery
-    (function(){
+      // T24: PROMISE_RESERVE leaves room for the lottery
       assert('T24 reserve keeps at least some cap for the draw', PROMISE_RESERVE < 1);
       assert('T24 reserve is a real share of the week', PROMISE_RESERVE > 0);
-    })();
 
-    // Roll back everything the tests touched, in memory AND on disk.
-    chores = __savedChores;
-    state  = __savedState;
-    save(LS_DATA, chores);
-    save(LS_STATE, state);
-  })();
+      // T25: checking off last week's chore on Tuesday credits last week
+      (function(){
+        const now = Date.now(), cur = weekStartTs(now);
+        const id = 'ztest-metsi';
+        chores.push({id, name:'Metsi Weekly', weight:1, cadenceDays:7, tags:[], enabled:true});
+        state.meta[id] = { lastDoneTs: addDaysTs(cur, -12) + 12*H };
+        const ts = addDaysTs(cur, -5) + 10*H;  // drawn Tuesday last week
+        const mk = monthKey(new Date(ts));
+        if(!state.months[mk]) state.months[mk] = { history: [] };
+        state.months[mk].history.push({ ts, weekStart: weekStartTs(ts), items:[{id, name:'Metsi Weekly', weight:1, owner:'Hannah'}], total:1, finish:false });
+        state.open[id] = { assignedTs: ts, owner:'Hannah', weekStart: weekStartTs(ts) };
+        assert('T25 last week\'s assignment is a leftover', getLeftovers(now).some(x => x.id === id));
+        markDone(id);
+        const ld = state.meta[id].lastDoneTs;
+        assert('T25 late check-off is credited to the week it was drawn for', ld < cur && ld >= weekStartTs(ts));
+        assert('T25 weekly chore is due again this week', isDueNow(getTaskById(id), Date.now()));
+        const ev = state.doneLog.filter(e => e.id === id).pop();
+        assert('T25 completion log remembers the week', !!ev && ev.weekStart === weekStartTs(ts));
+        const b = findBatch(ts);
+        assert('T25 last week\'s record says done', !!b && b.items[0].status === 'done');
+        chores = chores.filter(c => c.id !== id);
+        delete state.meta[id]; delete state.open[id];
+        state.doneLog = state.doneLog.filter(e => e.id !== id);
+        state.months[mk].history = state.months[mk].history.filter(h => h.ts !== ts);
+      })();
+
+      // T27: leftovers vs this week
+      (function(){
+        const now = Date.now(), cur = weekStartTs(now);
+        chores.push({id:'ztest-this', name:'This', weight:1, cadenceDays:14, tags:[], enabled:true});
+        chores.push({id:'ztest-old', name:'Old', weight:1, cadenceDays:14, tags:[], enabled:true});
+        state.open['ztest-this'] = { assignedTs: now, owner:'Adam', weekStart: cur };
+        state.open['ztest-old']  = { assignedTs: addDaysTs(cur, -3), owner:'Hannah', weekStart: addDaysTs(cur, -7) };
+        const ids = getLeftovers(now).map(x => x.id);
+        assert('T27 last week\'s open item is a leftover', ids.includes('ztest-old'));
+        assert('T27 this week\'s open item is not', !ids.includes('ztest-this'));
+        chores = chores.filter(c => c.id !== 'ztest-this' && c.id !== 'ztest-old');
+        delete state.open['ztest-this']; delete state.open['ztest-old'];
+      })();
+
+      // T28: Not done releases the assignment back into the pool
+      (function(){
+        const now = Date.now(), cur = weekStartTs(now);
+        const id = 'ztest-miss';
+        chores.push({id, name:'Miss', weight:1, cadenceDays:7, tags:[], enabled:true});
+        state.meta[id] = { lastDoneTs: addDaysTs(cur, -14) + 12*H };
+        const ts = addDaysTs(cur, -6) + 9*H;
+        const mk = monthKey(new Date(ts));
+        if(!state.months[mk]) state.months[mk] = { history: [] };
+        state.months[mk].history.push({ ts, weekStart: weekStartTs(ts), items:[{id, name:'Miss', weight:1, owner:'Adam'}], total:1, finish:false });
+        state.open[id] = { assignedTs: ts, owner:'Adam', weekStart: weekStartTs(ts) };
+        assert('T28 it starts out open, not in the pool', !getDueTasks().some(t => t.id === id));
+        releaseOpen(id, now, 'missed');
+        assert('T28 not done releases the assignment', !state.open[id]);
+        assert('T28 and puts the chore back in this week\'s pool', getDueTasks().some(t => t.id === id));
+        const b = findBatch(ts);
+        assert('T28 last week\'s record says not done', !!b && b.items[0].status === 'missed');
+        chores = chores.filter(c => c.id !== id);
+        delete state.meta[id];
+        state.months[mk].history = state.months[mk].history.filter(h => h.ts !== ts);
+      })();
+
+      // T29: Mark not done restores the previous last-done and the assignment
+      (function(){
+        const cur = weekStartTs(Date.now());
+        const id = 'ztest-undo';
+        chores.push({id, name:'Undo Me', weight:2, cadenceDays:14, tags:[], enabled:true});
+        const prev = addDaysTs(cur, -20) + 12*H;
+        state.meta[id] = { lastDoneTs: prev };
+        assignBatch([{id, name:'Undo Me', weight:2, owner:'Adam'}], false);
+        const assignedTs = state.open[id] && state.open[id].assignedTs;
+        markDone(id);
+        assert('T29 done moves last-done forward', state.meta[id].lastDoneTs > prev);
+        markNotDone(id);
+        assert('T29 mark not done restores the previous last-done', state.meta[id].lastDoneTs === prev);
+        assert('T29 mark not done puts the assignment back', !!state.open[id] && state.open[id].assignedTs === assignedTs);
+        const b = findBatch(assignedTs);
+        const it = b && b.items.find(x => x.id === id);
+        assert('T29 the batch item is open again', !!it && !it.status);
+        chores = chores.filter(c => c.id !== id);
+        delete state.meta[id]; delete state.open[id];
+        state.doneLog = state.doneLog.filter(e => e.id !== id);
+        for(const mm of Object.values(state.months)) mm.history = (mm.history || []).filter(h => h.ts !== assignedTs);
+      })();
+
+      // T30: a draw counts against this week's cap
+      (function(){
+        const cur = weekStartTs(Date.now());
+        const id = 'ztest-cap';
+        chores.push({id, name:'Cap', weight:2.5, cadenceDays:14, tags:[], enabled:true});
+        const before = weekAssignedWeight(cur);
+        assignBatch([{id, name:'Cap', weight:2.5, owner:'Hannah'}], false);
+        assert('T30 a draw counts against this week\'s cap', Math.abs(weekAssignedWeight(cur) - (before + 2.5)) < 1e-9);
+        const ts = state.open[id] && state.open[id].assignedTs;
+        chores = chores.filter(c => c.id !== id);
+        delete state.open[id];
+        for(const mm of Object.values(state.months)) mm.history = (mm.history || []).filter(h => h.ts !== ts);
+      })();
+
+      // T31: stray cycle boundaries left by old self-tests get cleaned up
+      (function(){
+        const savedStarts = state.cycleStarts.slice();
+        const savedMeta = Object.assign({}, state.cycleStartsMeta);
+        const a = new Date(2025, 0, 5).getTime();   // a Sunday
+        const w2 = addDaysTs(a, 14), w4 = addDaysTs(a, 28), w6 = addDaysTs(a, 42);
+        state.cycleStarts = [a, w2, w4, w6];
+        state.cycleStartsMeta = {};
+        state.cycleStartsMeta[w4] = 'manual';
+        repairCycleStarts();
+        const out = state.cycleStarts;
+        assert('T31 keeps the first boundary and the early one', out.includes(a) && out.includes(w4));
+        assert('T31 drops the 2-week strays', !out.includes(w2) && !out.includes(w6));
+        let gapsOk = true;
+        for(let k=1;k<out.length;k++){ if(Math.round((out[k]-out[k-1])/MS_DAY) !== 28) gapsOk = false; }
+        assert('T31 the rebuilt cycles are 4 weeks apart', gapsOk);
+        assert('T31 the rebuilt list reaches the present', out[out.length-1] <= Date.now() && addDaysTs(out[out.length-1], 28) > Date.now());
+        state.cycleStarts = savedStarts;
+        state.cycleStartsMeta = savedMeta;
+      })();
+
+      // T32: Skip a week brings the chore back next Sunday
+      (function(){
+        const cur = weekStartTs(Date.now());
+        const id = 'ztest-snz';
+        const fx = {id, name:'Skip', weight:1, cadenceDays:7, tags:[], enabled:true};
+        chores.push(fx);
+        state.meta[id] = { lastDoneTs: addDaysTs(cur, -14) + 12*H };
+        snooze(id, 1);
+        assert('T32 skip lands exactly on next Sunday', state.meta[id].snoozeUntilTs === addDaysTs(cur, 7));
+        assert('T32 skipped chore is not due this week', !isDueNow(fx, Date.now()));
+        assert('T32 skipped chore is due next Sunday morning', isDueNow(fx, addDaysTs(cur, 7) + 8*H));
+        chores = chores.filter(c => c.id !== id);
+        delete state.meta[id];
+      })();
+
+      // T33: a cadence shorter than a week acts as weekly
+      (function(){
+        const now = Date.now(), cur = weekStartTs(now);
+        const fx = {id:'ztest-short', name:'Short', weight:1, cadenceDays:3, tags:[], enabled:true};
+        state.meta[fx.id] = { lastDoneTs: now };
+        assert('T33 a 3-day chore done today is not due again this week', !isDueNow(fx, now));
+        assert('T33 it is due next week', isDueNow(fx, addDaysTs(cur, 7) + 8*H));
+        delete state.meta[fx.id];
+      })();
+
+      // T18: an early cycle unsticks a fully-completed cycle
+      (function(){
+        const now = Date.now();
+        const before = currentCycleStartTs(now);
+        const tmp = { id:'ztest-early', cadenceDays:30, enabled:true };
+        state.meta[tmp.id] = { lastDoneTs: now - 1000 };
+        assert('T18 completed cycle-reset chore is not due', isDueNow(tmp, now) === false);
+        const candidate = candidateBoundary(now);
+        assert('T18 candidate boundary lands after the completion', candidate > (now - 1000));
+        assert('T18 a new cycle would unlock it', isDueNow(tmp, now, candidate) === true);
+        const nb = startNewCycle(now, 'manual');
+        assert('T18 startNewCycle moves the boundary forward', nb > before && currentCycleStartTs() === nb);
+        assert('T18 chore is due again in the new cycle', isDueNow(tmp, Date.now()) === true);
+        delete state.meta[tmp.id];
+      })();
+      // T26: starting a new cycle keeps open assignments
+      (function(){
+        const id = 'ztest-keep';
+        chores.push({id, name:'Keep', weight:1, cadenceDays:14, tags:[], enabled:true});
+        const cs0 = currentCycleStartTs();
+        state.open[id] = { assignedTs: cs0 - 60000, owner:'Adam', weekStart: weekStartTs(cs0 - 60000) };
+        startNewCycle(Date.now(), 'manual');
+        assert('T26 starting a cycle keeps open assignments', !!state.open[id]);
+        maybeRolloverCycle();
+        assert('T26 a rollover keeps them too', !!state.open[id]);
+        chores = chores.filter(c => c.id !== id);
+        delete state.open[id];
+      })();
+
+    }catch(err){
+      failed++;
+      console.error('[Test] suite crashed', err);
+    }finally{
+      chores = realChores;
+      state = realState;
+      persistEnabled = true;
+      renderAll();
+      console.log('[Test] ' + passed + ' passed, ' + failed + ' failed. Ran in a sandbox; saved data was not touched.');
+      if(typeof window !== 'undefined') window.__choreSelfTest = { passed, failed };
+    }
+  }
+
+  if(shouldRunSelfTests()) runSelfTests();
 
 })();
 </script>
